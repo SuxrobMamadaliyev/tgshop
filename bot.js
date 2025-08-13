@@ -3645,7 +3645,7 @@ bot.action(/confirm_pubg:(\w+):(\d+)/, async (ctx) => {
         `💰 Kerak: ${price.toLocaleString()} so'm\n` +
         `💳 Mavjud: ${userBalance.toLocaleString()} so'm\n` +
         `📦 Buyurtma: ${amount} ${productType}\n` +
-        `🆔 Buyurtma: #${orderId}\n\n` +
+        `� Buyurtma: #${orderId}\n\n` +
         `❌ Iltimos, foydalanuvchiga xabar bering!`,
         { 
           parse_mode: 'Markdown',
@@ -3667,18 +3667,20 @@ bot.action(/confirm_pubg:(\w+):(\d+)/, async (ctx) => {
     // Delete the order from pending orders
     delete pendingOrders[orderId];
     
-    // Notify user
+    // Notify user - escape special characters for MarkdownV2
+    const escapedGameId = String(gameId).replace(/([_*[\]()~`>#+=|{}.!-])/g, '\\$1');
+    
     try {
       await bot.telegram.sendMessage(
         userId,
-        `✅ Sizning #${orderId} raqamli buyurtmangiz tasdiqlandi!\n\n` +
+        `✅ Sizning #${orderId} raqamli buyurtmangiz tasdiqlandi\!\n\n` +
         `📦 Mahsulot: *${amount} ${productType}*\n` +
-        `👤 O'yin ID: *${gameId}*\n` +
+        `👤 O'yin ID: *${escapedGameId}*\n` +
         `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
         `💰 Qolgan balans: *${(userBalance - price).toLocaleString()} so'm*\n\n` +
-        `📦 Buyurtmangiz tez orada yetkazib beriladi.\n` +
+        `📦 Buyurtmangiz tez orada yetkazib beriladi\.\n` +
         `📞 Savollar bo'lsa: @d1yor_salee`,
-        { parse_mode: 'Markdown' }
+        { parse_mode: 'MarkdownV2' }
       );
     } catch (error) {
       console.error('Foydalanuvchiga xabar yuborishda xatolik:', error);
@@ -4168,13 +4170,20 @@ bot.on('text', async (ctx, next) => {
       `🔢 Miqdor: ${amount} ${type.endsWith('_uc') ? 'UC' : type.endsWith('_pp') ? 'PP' : ''}\n` +
       `💰 Narxi: ${price.toLocaleString()} so'm`;
     
-    // Notify user
+    // Notify user - escape special Markdown characters
+    const escapedDetails = orderDetails
+      .replace(/_/g, '\\_')
+      .replace(/-/g, '\\-')
+      .replace('*', '\*')
+      .replace('`', '\`')
+      .replace('[', '\[');
+      
     await ctx.reply(
       `✅ Buyurtmangiz qabul qilindi!\n\n` +
-      `${orderDetails.replace(/\*/g, '')}\n\n` +
+      `${escapedDetails}\n\n` +
       `🔄 Buyurtmangiz tekshirish uchun adminga yuborildi.\n` +
       `⏳ Iltimos, tasdiqlanishini kuting.`,
-      { parse_mode: 'Markdown' }
+      { parse_mode: 'MarkdownV2' }
     );
     
     // Notify admin
