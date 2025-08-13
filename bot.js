@@ -3128,14 +3128,17 @@ bot.on('text', async (ctx, next) => {
     // Clear buying state
     ctx.session.buying = null;
     
-    // Send confirmation to user
-    await ctx.replyWithMarkdown(
+    // Send confirmation to user with escaped Markdown
+    const escapedUsername = username.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    const escapedOrderId = orderId.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    
+    await ctx.reply(
       `✅ Sotib olish so'rovi qabul qilindi!\n\n` +
-      `📦 Mahsulot: *${amount} ${productType}*\n` +
-      `👤 O'yinchi: *${username}*\n` +
-      `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
-      `💰 Joriy balans: *${userBalance.toLocaleString()} so'm*\n\n` +
-      `🆔 Buyurtma raqami: *${orderId}*\n` +
+      `📦 Mahsulot: *${String(amount).replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&')} ${productType.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&')}*\n` +
+      `👤 O'yinchi: *${escapedUsername}*\n` +
+      `💳 To'lov: *${price.toLocaleString().replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&')} so'm*\n` +
+      `💰 Joriy balans: *${userBalance.toLocaleString().replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&')} so'm*\n\n` +
+      `🆔 Buyurtma raqami: *${escapedOrderId}*\n` +
       `📞 Aloqa: @d1yor_salee\n\n` +
       `💡 Iltimos, to'lovni tasdiqlash uchun adminlarimiz kuting.`,
       { parse_mode: 'Markdown' }
