@@ -4133,9 +4133,9 @@ bot.on('text', async (ctx, next) => {
 // Webhook configuration for production
 const isProduction = process.env.NODE_ENV === 'production';
 const PORT = process.env.PORT || 3000;
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'your-secret-path';
 
 // Initialize Express app
-const express = require('express');
 const app = express();
 
 // Middleware to parse JSON
@@ -4147,8 +4147,15 @@ app.get('/health', (req, res) => {
 });
 
 // Webhook endpoint for Telegram
-app.post(`/webhook/${process.env.BOT_TOKEN}`, (req, res) => {
+app.post(`/webhook/${WEBHOOK_SECRET}`, (req, res) => {
   bot.handleUpdate(req.body, res);
+  res.status(200).send('OK');
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('Webhook error:', err);
+  res.status(500).send('Internal Server Error');
 });
 
 // Start the server
@@ -4159,9 +4166,9 @@ if (isProduction) {
     
     try {
       // Set webhook in production
-      const webhookUrl = `${process.env.RENDER_EXTERNAL_URL}/webhook/${process.env.BOT_TOKEN}`;
+      const webhookUrl = `${process.env.RENDER_EXTERNAL_URL}/webhook/${WEBHOOK_SECRET}`;
       await bot.telegram.setWebhook(webhookUrl);
-      console.log(`Webhook set to: ${webhookUrl}`);
+      console.log(`Webhook set to: ${webhookUrl.replace(WEBHOOK_SECRET, '***')}`);
       
       // Get webhook info
       const webhookInfo = await bot.telegram.getWebhookInfo();
