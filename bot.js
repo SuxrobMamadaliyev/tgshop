@@ -2553,9 +2553,10 @@ bot.action('topup:check_payment', async (ctx) => {
   const paymentId = generateOrderId();
   
   // Adminlarga xabar yuboramiz
-  // Escape special characters for Markdown
-  const escapeMarkdown = (text) => {
-    return text.replace(/[_*[\]()~`>#+\-={}|.!]/g, '\\$&');
+  // Escape special characters for MarkdownV2
+  function escapeMarkdown(text) {
+    if (!text) return '';
+    return String(text).replace(/[\_\*\[\]\(\)\~\`\>\#\+\-\=\|\{\}\.\!]/g, '\\$&');
   };
 
   // Format message with MarkdownV2
@@ -4194,13 +4195,8 @@ bot.on('text', async (ctx, next) => {
       `🔢 Miqdor: ${amount} ${unit}\n` +
       `💰 Narxi: ${price.toLocaleString()} so'm`;
     
-    // Notify user - escape special Markdown characters
-    const escapedDetails = orderDetails
-      .replace(/_/g, '\\_')
-      .replace(/-/g, '\\-')
-      .replace('*', '\*')
-      .replace('`', '\`')
-      .replace('[', '\[');
+    // Notify user - escape all special Markdown characters
+    const escapedDetails = escapeMarkdown(orderDetails);
       
     await ctx.reply(
       `✅ Buyurtmangiz qabul qilindi!\n\n` +
