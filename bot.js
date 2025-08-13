@@ -4137,40 +4137,61 @@ bot.on('text', async (ctx, next) => {
   if (ctx.session && ctx.session.buying) {
     const { type, amount, price } = ctx.session.buying;
     const userId = ctx.from.id;
-    const gameId = ctx.message.text.trim();
+    let username = ctx.message.text.trim();
     
-    // Validate game ID format
-    if (!gameId) {
-      await ctx.reply('❌ Iltimos, o\'yin ID yoki foydalanuvchi nomini kiriting.');
+    // Remove @ from username if present
+    if (username.startsWith('@')) {
+      username = username.substring(1);
+    }
+    
+    // Validate username format
+    if (!username) {
+      await ctx.reply('❌ Iltimos, to\'g\'ri formatda username kiriting. Masalan: @username yoki username');
       return;
     }
     
     // Generate order ID
     const orderId = generateOrderId();
     
-    // Determine product name based on type
+    // Determine product name and unit based on type
     let productName = '';
-    if (type === 'pubg_uc') productName = 'PUBG Mobile UC';
-    else if (type === 'pubg_pp') productName = 'PUBG Mobile PP';
-    else if (type === 'premium') productName = 'Telegram Premium';
-    else productName = 'Noma\'lum';
+    let unit = '';
+    
+    if (type === 'premium') {
+      productName = 'Telegram Premium';
+      unit = 'oy';
+    } else if (type === 'stars') {
+      productName = 'Telegram Stars';
+      unit = 'ta';
+    } else if (type === 'pubg_uc') {
+      productName = 'PUBG Mobile UC';
+      unit = 'UC';
+    } else if (type === 'pubg_pp') {
+      productName = 'PUBG Mobile PP';
+      unit = 'PP';
+    } else {
+      productName = 'Noma\'lum';
+      unit = '';
+    }
     
     // Save order to pending orders
     pendingOrders[orderId] = {
       userId,
       type,
       amount,
-      gameId,
+      username: `@${username}`,
       price,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      status: 'pending',
+      productName: `${amount} ${unit} ${productName}`
     };
     
     // Create order details message
     const orderDetails = `🆔 Buyurtma: #${orderId}\n` +
       `👤 Foydalanuvchi: [${ctx.from.first_name || 'Foydalanuvchi'}](tg://user?id=${userId}) (ID: ${userId})\n` +
-      `🎮 O'yin ID: ${gameId}\n` +
+      `📱 Username: @${username}\n` +
       `📦 Mahsulot: ${productName}\n` +
-      `🔢 Miqdor: ${amount} ${type.endsWith('_uc') ? 'UC' : type.endsWith('_pp') ? 'PP' : ''}\n` +
+      `🔢 Miqdor: ${amount} ${unit}\n` +
       `💰 Narxi: ${price.toLocaleString()} so'm`;
     
     // Notify user - escape special Markdown characters
