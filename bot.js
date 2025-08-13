@@ -4098,6 +4098,82 @@ bot.on('text', async (ctx, next) => {
     return;
   }
   
+    // Handle username input for Stars/Premium purchase
+  if (ctx.session && ctx.session.buying) {
+    const { type, amount, price } = ctx.session.buying;
+    const userId = ctx.from.id;
+    const username = ctx.message.text.trim();
+    
+    // Validate username format
+    if (!username.startsWith('@')) {
+      await ctx.reply('❌ Iltimos, usernameni @ belgisi bilan kiriting. Masalan: @username');
+      return;
+    }
+    
+    // Generate order ID
+    const orderId = generateOrderId();
+    
+    // Save order to pending orders
+    pendingOrders[orderId] = {
+      userId,
+      type,
+      amount,
+      username,
+      price,
+      timestamp: new Date().toISOString()
+    };
+    
+    // Deduct balance
+    updateUserBalance(userId, -price);
+    
+    // Create order details message
+    const orderDetails = `🆔 Buyurtma: #${orderId}\n` +
+      `👤 Foydalanuvchi: ${username} (ID: ${userId})\n` +
+      `📦 Mahsulot: ${type === 'premium' ? 'Telegram Premium' : 'Telegram Stars'}\n` +
+      `🔢 Miqdor: ${amount} ${type === 'premium' ? 'oy' : 'stars'}\n` +
+      `💰 Narxi: ${price.toLocaleString()} so'm`;
+    
+    // Notify user
+    await ctx.reply(
+      `✅ Buyurtmangiz qabul qilindi!\n\n` +
+      `${orderDetails}\n\n` +
+      `🔄 Buyurtmangiz tekshirish uchun adminga yuborildi.\n` +
+      `⏳ Iltimos, tasdiqlanishini kuting.`
+    );
+    
+    // Notify admin
+    const adminMessage = `🆕 *Yangi buyurtma!*\n\n` +
+      `${orderDetails}\n\n` +
+      `🕒 Sana: ${new Date().toLocaleString()}`;
+    
+    // Send notification to all admins
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await bot.telegram.sendMessage(
+          adminId,
+          adminMessage,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '✅ Tasdiqlash', callback_data: `confirm_order:${orderId}` },
+                  { text: '❌ Rad etish', callback_data: `cancel_order:${orderId}` }
+                ]
+              ]
+            }
+          }
+        );
+      } catch (error) {
+        console.error(`Failed to send notification to admin ${adminId}:`, error);
+      }
+    }
+    
+    // Clear the buying session
+    delete ctx.session.buying;
+    return;
+  }
+  
   // Handle card information updates
   if (ctx.session && ctx.session.editingCard) {
     const { field } = ctx.session.editingCard;
@@ -4149,18 +4225,53 @@ const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || 'your-secret-path';
 // Initialize Express app
 const app = express();
 
-// Middleware to parse JSON
-app.use(express.json());
+// Middleware to parse JSON with increased limit
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Log all incoming requests for debugging
+app.use((req, res, next) => {
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`);
+  next();
+});
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).send('OK');
+  res.status(200).json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    env: process.env.NODE_ENV || 'development'
+  });
+});
+
+// Add a simple root endpoint
+app.get('/', (req, res) => {
+  res.send('Telegram Bot is running. Use /webhook/<secret> for Telegram updates.');
 });
 
 // Webhook endpoint for Telegram
-app.post(`/webhook/${WEBHOOK_SECRET}`, (req, res) => {
-  bot.handleUpdate(req.body, res);
-  res.status(200).send('OK');
+app.post(`/webhook/${WEBHOOK_SECRET}`, async (req, res) => {
+  try {
+    // Log incoming update for debugging
+    console.log('Received webhook update:', JSON.stringify({
+      update_id: req.body.update_id,
+      message: req.body.message ? 'message received' : 'no message',
+      callback_query: req.body.callback_query ? 'callback_query received' : 'no callback_query'
+    }));
+    
+    // Process the update
+    await bot.handleUpdate(req.body, res);
+    
+    // If handleUpdate didn't send a response, send a success response
+    if (!res.headersSent) {
+      res.status(200).send('OK');
+    }
+  } catch (error) {
+    console.error('Error in webhook handler:', error);
+    if (!res.headersSent) {
+      res.status(200).send('Error processing update');
+    }
+  }
 });
 
 // Error handling middleware
@@ -4169,46 +4280,111 @@ app.use((err, req, res, next) => {
   res.status(500).send('Internal Server Error');
 });
 
+// Function to set up webhook with retry logic
+async function setupWebhook() {
+  const maxRetries = 3;
+  let retryCount = 0;
+  const webhookUrl = `${process.env.RENDER_EXTERNAL_URL}/webhook/${WEBHOOK_SECRET}`;
+  
+  while (retryCount < maxRetries) {
+    try {
+      console.log(`Setting webhook (attempt ${retryCount + 1}/${maxRetries})...`);
+      
+      // First delete any existing webhook
+      await bot.telegram.deleteWebhook({ drop_pending_updates: true });
+      console.log('Deleted existing webhook');
+      
+      // Set the new webhook
+      await bot.telegram.setWebhook(webhookUrl, {
+        allowed_updates: ['message', 'callback_query', 'chat_member', 'my_chat_member'],
+        drop_pending_updates: true
+      });
+      
+      console.log(`✅ Webhook set to: ${webhookUrl.replace(WEBHOOK_SECRET, '***')}`);
+      
+      // Verify webhook was set correctly
+      const webhookInfo = await bot.telegram.getWebhookInfo();
+      console.log('Webhook info:', {
+        url: webhookInfo.url ? webhookInfo.url.replace(WEBHOOK_SECRET, '***') : 'none',
+        has_custom_certificate: webhookInfo.has_custom_certificate,
+        pending_update_count: webhookInfo.pending_update_count,
+        last_error_date: webhookInfo.last_error_date ? new Date(webhookInfo.last_error_date * 1000).toISOString() : 'none',
+        last_error_message: webhookInfo.last_error_message || 'none',
+        max_connections: webhookInfo.max_connections,
+        ip_address: webhookInfo.ip_address || 'none'
+      });
+      
+      return true;
+    } catch (error) {
+      retryCount++;
+      console.error(`Error setting webhook (attempt ${retryCount}/${maxRetries}):`, error.message);
+      
+      if (retryCount < maxRetries) {
+        // Wait for 5 seconds before retrying
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      } else {
+        console.error('Failed to set webhook after multiple attempts');
+        return false;
+      }
+    }
+  }
+}
+
 // Start the server
 if (isProduction) {
-  // For production (Render)
-  const server = app.listen(PORT, async () => {
+  const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Webhook secret: ${WEBHOOK_SECRET ? '***' + WEBHOOK_SECRET.slice(-4) : 'not set'}`);
     
-    try {
-      // Set webhook in production
-      const webhookUrl = `${process.env.RENDER_EXTERNAL_URL}/webhook/${WEBHOOK_SECRET}`;
-      await bot.telegram.setWebhook(webhookUrl);
-      console.log(`Webhook set to: ${webhookUrl.replace(WEBHOOK_SECRET, '***')}`);
-      
-      // Get webhook info
-      const webhookInfo = await bot.telegram.getWebhookInfo();
-      console.log('Webhook info:', webhookInfo);
-    } catch (error) {
-      console.error('Error setting webhook:', error);
+    // Set up webhook in production
+    if (isProduction) {
+      setupWebhook().then(success => {
+        if (!success) {
+          console.error('Failed to set up webhook after multiple attempts. The bot may not receive updates.');
+        }
+      });
     }
   });
   
-  // Handle graceful shutdown
-  process.once('SIGINT', () => {
-    console.log('SIGINT received. Shutting down gracefully...');
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
-    });
+  // Handle uncaught exceptions
+  process.on('uncaughtException', (error) => {
+    console.error('Uncaught Exception:', error);
+    // Don't crash the process in production
   });
   
-  process.once('SIGTERM', () => {
-    console.log('SIGTERM received. Shutting down gracefully...');
+  // Handle unhandled promise rejections
+  process.on('unhandledRejection', (reason, promise) => {
+    console.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  });
+  
+  // Handle graceful shutdown
+  const shutdown = async (signal) => {
+    console.log(`${signal} received. Shutting down gracefully...`);
+    
+    try {
+      // Delete webhook before shutting down
+      await bot.telegram.deleteWebhook();
+      console.log('Webhook deleted');
+    } catch (error) {
+      console.error('Error deleting webhook:', error);
+    }
+    
     server.close(() => {
       console.log('Server closed');
       process.exit(0);
     });
-  });
+  };
+  
+  process.once('SIGINT', () => shutdown('SIGINT'));
+  process.once('SIGTERM', () => shutdown('SIGTERM'));
 } else {
   // For local development
   console.log('Starting in development mode with polling...');
-  bot.launch();
+  bot.launch({
+    dropPendingUpdates: true,
+    allowedUpdates: ['message', 'callback_query', 'chat_member', 'my_chat_member']
+  });
   
   // Enable graceful stop for development
   process.once('SIGINT', () => bot.stop('SIGINT'));
