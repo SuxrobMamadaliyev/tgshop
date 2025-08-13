@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: onerinchimijoz
+    env: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BOT_TOKEN
+        fromService:
+          name: onerinchimijoz
+          type: web
+          envVarKey: BOT_TOKEN
+      - key: RENDER
+        value: "true"
+      - key: RENDER_EXTERNAL_URL
+        fromService:
+          name: onerinchimijoz
+          type: web
+          property: url
+    plan: free
