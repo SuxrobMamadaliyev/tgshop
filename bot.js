@@ -408,30 +408,35 @@ async function sendOrUpdateMenu(ctx, caption, keyboard) {
         // Boshqa menyular uchun mavjud xabarni tahrirlashga harakat qilamiz
         try {
           // Avvalgi xabarni tahrirlashga harakat qilamiz
-          try {
-            await ctx.editMessageText(caption, {
-              ...Markup.inlineKeyboard(keyboard),
-              parse_mode: 'Markdown'
-            });
-            return;
-          } catch (editError) {
-            console.error('Xabarni tahrirlashda xatolik:', editError);
-            throw editError; // Keyingi catch blokiga o'tish uchun
+          if (ctx.callbackQuery?.message) {
+            try {
+              await ctx.editMessageText(caption, {
+                ...Markup.inlineKeyboard(keyboard),
+                parse_mode: 'Markdown',
+                disable_web_page_preview: true
+              });
+              return;
+            } catch (editError) {
+              console.log('Xabarni tahrirlab bo\'lmadi, yangi xabar yuborilmoqda:', editError.message);
+            }
           }
-        } catch (e) {
+          
           // Agar tahrirlab bo'lmasa, yangi xabar yuboramiz
           try {
             // Avvalgi xabarni o'chirishga harakat qilamiz (agar mavjud bo'lsa)
-            try { 
-              await ctx.deleteMessage(); 
-            } catch (deleteError) {
-              console.log('Eski xabarni o\'chirib bo\'lmadi:', deleteError.message);
+            if (ctx.callbackQuery?.message) {
+              try { 
+                await ctx.deleteMessage(); 
+              } catch (deleteError) {
+                console.log('Eski xabarni o\'chirib bo\'lmadi:', deleteError.message);
+              }
             }
             
             // Yangi xabar yuboramiz
             await ctx.reply(caption, {
               ...Markup.inlineKeyboard(keyboard),
-              parse_mode: 'Markdown'
+              parse_mode: 'Markdown',
+              disable_web_page_preview: true
             });
           } catch (sendError) {
             console.error('Yangi xabar yuborishda xatolik:', sendError);
@@ -442,13 +447,14 @@ async function sendOrUpdateMenu(ctx, caption, keyboard) {
               console.error('Yakuniy xabar yuborishda xatolik:', finalError);
             }
           }
+        } catch (e) {
+          console.error('Xatolik yuz berdi:', e);
         }
       }
     } else {
       // Yangi suhbat boshlanganda
       if (caption === 'Bo\'limni tanlang:') {
         try {
-          const greeting = `Assalomu alaykum, ${ctx.from.first_name || 'foydalanuvchi'}!\n\n`;
           const absolutePath = path.resolve(MENU_IMAGE);
           console.log('Trying to send image from (second instance):', absolutePath);
           
@@ -469,20 +475,25 @@ async function sendOrUpdateMenu(ctx, caption, keyboard) {
                 parse_mode: 'Markdown'
               }
             );
-          } catch (error) {
-            console.error('Rasm yuborishda xatolik (second instance):', error);
-            throw error; // Re-throw to be caught by the outer catch block
+          } catch (photoError) {
+            console.error('Rasm yuborishda xatolik (second instance):', photoError);
+            throw photoError; // Re-throw to be caught by the outer catch block
           }
         } catch (error) {
           console.error('Rasm yuklanmadi:', error);
-          await ctx.reply(caption, Markup.inlineKeyboard(keyboard));
+          await ctx.reply(greeting + caption, Markup.inlineKeyboard(keyboard));
         }
       } else {
-        await ctx.reply(caption, Markup.inlineKeyboard(keyboard));
+        await ctx.reply(greeting + caption, Markup.inlineKeyboard(keyboard));
       }
     }
   } catch (error) {
     console.error('Xatolik yuz berdi:', error);
+    try {
+      await ctx.reply('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
+    } catch (e) {
+      console.error('Xatolik haqida xabar yuborib bo\'lmadi:', e);
+    }
   }
 }
 
