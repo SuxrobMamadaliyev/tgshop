@@ -3624,25 +3624,13 @@ bot.action(/confirm_pubg:(\w+):(\d+)/, async (ctx) => {
   const userId = parseInt(ctx.match[2]);
   
   try {
-    // Get order details from database
-    // const order = await getOrder(orderId);
-    // if (!order) {
-    //   return await ctx.answerCbQuery('Buyurtma topilmadi!');
-    // }
-    
-    // Get order from global storage
-    if (!global.orders || !global.orders[orderId]) {
-      return await ctx.answerCbQuery('Buyurtma ma\'lumotlari topilmadi! Iltimos, foydalanuvchi qaytadan buyurtma bersin.');
+    // Get order from pending orders
+    const order = pendingOrders[orderId];
+    if (!order) {
+      return await ctx.answerCbQuery('Buyurtma topilmadi yoki allaqachon bajarilgan!');
     }
     
-    const order = global.orders[orderId];
-    
-    // Check if order is already processed
-    if (order.status === 'completed') {
-      return await ctx.answerCbQuery('Bu buyurtma allaqachon bajarilgan!');
-    }
-    
-    const { type, amount, price, username } = order;
+    const { type, amount, price, gameId } = order;
     const productType = type === 'pubg_uc' ? 'UC' : 'PP';
     
     // Get current user balance
@@ -3653,47 +3641,59 @@ bot.action(/confirm_pubg:(\w+):(\d+)/, async (ctx) => {
       await ctx.answerCbQuery('Foydalanuvchida yetarli mablag\' mavjud emas!');
       return await ctx.editMessageText(
         `❌ *Balans yetarli emas!*\n` +
-        `👤 Foydalanuvchi: [${order.userName || 'Noma\'lum'}](tg://user?id=${userId})\n` +
+        `👤 Foydalanuvchi: [${ctx.from.first_name || 'Foydalanuvchi'}](tg://user?id=${userId})\n` +
         `💰 Kerak: ${price.toLocaleString()} so'm\n` +
         `💳 Mavjud: ${userBalance.toLocaleString()} so'm\n` +
         `📦 Buyurtma: ${amount} ${productType}\n` +
         `🆔 Buyurtma: #${orderId}\n\n` +
         `❌ Iltimos, foydalanuvchiga xabar bering!`,
-        { parse_mode: 'Markdown' }
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '💳 Balans to\'ldirish', callback_data: `admin:topup_user:${userId}` },
+                { text: '❌ Bekor qilish', callback_data: `reject_pubg:${orderId}:${userId}` }
+              ]
+            ]
+          }
+        }
       );
     }
     
     // Deduct balance
     updateUserBalance(userId, -price);
     
-    // Update order status in global storage
-    if (global.orders && global.orders[orderId]) {
-      global.orders[orderId].status = 'completed';
-      global.orders[orderId].completedAt = new Date().toISOString();
-      global.orders[orderId].completedBy = ctx.from.id;
-    }
+    // Delete the order from pending orders
+    delete pendingOrders[orderId];
     
     // Notify user
-    await bot.telegram.sendMessage(
-      userId,
-      `✅ Sizning #${orderId} raqamli buyurtmangiz tasdiqlandi!\n\n` +
-      `📦 Mahsulot: *${amount} ${productType}*\n` +
-      `👤 O'yinchi: *${username}*\n` +
-      `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
-      `💰 Qolgan balans: *${(userBalance - price).toLocaleString()} so'm*\n\n` +
-      `📦 Buyurtmangiz tez orada yetkazib beriladi.\n` +
-      `📞 Savollar bo'lsa: @d1yor_salee`,
-      { parse_mode: 'Markdown' }
-    );
+    try {
+      await bot.telegram.sendMessage(
+        userId,
+        `✅ Sizning #${orderId} raqamli buyurtmangiz tasdiqlandi!\n\n` +
+        `📦 Mahsulot: *${amount} ${productType}*\n` +
+        `👤 O'yin ID: *${gameId}*\n` +
+        `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
+        `💰 Qolgan balans: *${(userBalance - price).toLocaleString()} so'm*\n\n` +
+        `📦 Buyurtmangiz tez orada yetkazib beriladi.\n` +
+        `📞 Savollar bo'lsa: @d1yor_salee`,
+        { parse_mode: 'Markdown' }
+      );
+    } catch (error) {
+      console.error('Foydalanuvchiga xabar yuborishda xatolik:', error);
+      // Continue even if user notification fails
+    }
     
     // Update admin message
     await ctx.answerCbQuery('✅ Buyurtma tasdiqlandi!');
     await ctx.editMessageText(
       `✅ *Buyurtma tasdiqlandi*\n` +
       `🆔 Buyurtma: #${orderId}\n` +
-      `👤 Foydalanuvchi: [${order.userName || 'Noma\'lum'}](tg://user?id=${userId})\n` +
+      `👤 Foydalanuvchi: [${ctx.from.first_name || 'Foydalanuvchi'}](tg://user?id=${userId})\n` +
+      `🎮 O'yin ID: ${gameId}\n` +
+      `📦 Mahsulot: ${amount} ${productType}\n` +
       `💰 Summa: ${price.toLocaleString()} so'm\n` +
-      `📦 Miqdor: ${amount} ${productType}\n` +
       `👤 Admin: ${ctx.from.first_name}\n` +
       `⏰ Vaqt: ${new Date().toLocaleString()}`,
       { 
@@ -3702,14 +3702,10 @@ bot.action(/confirm_pubg:(\w+):(\d+)/, async (ctx) => {
       }
     );
     
-    // Remove order from session
-    if (ctx.session.orders && ctx.session.orders[orderId]) {
-      delete ctx.session.orders[orderId];
-    }
-    
   } catch (error) {
-    console.error('Tasdiqlashda xatolik:', error);
+    console.error('Buyurtmani tasdiqlashda xatolik:', error);
     await ctx.answerCbQuery('Xatolik yuz berdi!');
+    await ctx.reply(`❌ Xatolik: ${error.message}`);
   }
 });
 
@@ -3719,59 +3715,61 @@ bot.action(/reject_pubg:(\w+):(\d+)/, async (ctx) => {
     await ctx.answerCbQuery('Ruxsat yo\'q!');
     return;
   }
-
+  
   const orderId = ctx.match[1];
-  const userId = ctx.match[2];
+  const userId = parseInt(ctx.match[2]);
+  const order = pendingOrders[orderId];
+  
+  if (!order) {
+    await ctx.answerCbQuery('Buyurtma topilmadi yoki allaqachon bajarilgan!');
+    return;
+  }
+  
+  const { type, amount, price, gameId } = order;
+  const productType = type === 'pubg_uc' ? 'UC' : 'PP';
   
   try {
-    // Get order from global storage
-    if (!global.orders || !global.orders[orderId]) {
-      return await ctx.answerCbQuery('Buyurtma topilmadi!');
-    }
-    
-    const order = global.orders[orderId];
-    
-    // Update order status in global storage
-    if (global.orders[orderId]) {
-      global.orders[orderId].status = 'rejected';
-      global.orders[orderId].rejectedAt = new Date().toISOString();
-      global.orders[orderId].rejectedBy = ctx.from.id;
-    }
-    
-    // Notify user
+    // Foydalanuvchiga xabar
     try {
       await bot.telegram.sendMessage(
         userId,
-        `❌ Sizning #${orderId} raqamli buyurtmangiz bekor qilindi!\n` +
-        `📦 Mahsulot: *${order.amount} ${order.type === 'pubg_uc' ? 'UC' : 'PP'}*\n` +
-        `💰 Summa: *${order.price.toLocaleString()} so'm*\n` +
-        `⏰ Sana: ${new Date().toLocaleString()}\n\n` +
-        `ℹ Sabab: Admin tomonidan bekor qilindi\n` +
-        `📞 Savollar bo'lsa: @d1yor_salee`,
+        `❌ Sizning #${orderId} raqamli buyurtmangiz bekor qilindi!\n\n` +
+        `📦 Mahsulot: *${amount} ${productType}*\n` +
+        `👤 O'yin ID: *${gameId}*\n` +
+        `💰 To'lov: *${price.toLocaleString()} so'm*\n\n` +
+        `ℹ Iltimos, qaytadan urinib ko'ring yoki murojaat qiling.\n` +
+        `📞 Aloqa: @d1yor_salee`,
         { parse_mode: 'Markdown' }
       );
     } catch (error) {
       console.error('Foydalanuvchiga xabar yuborishda xatolik:', error);
+      // Continue even if user notification fails
     }
     
-    // Update admin message
+    // Admin xabarini yangilash
     await ctx.answerCbQuery('✅ Buyurtma bekor qilindi!');
     await ctx.editMessageText(
       `❌ *Buyurtma bekor qilindi*\n` +
       `🆔 Buyurtma: #${orderId}\n` +
-      `👤 Foydalanuvchi: [${order.userName || 'Noma\'lum'}](tg://user?id=${userId})\n` +
-      `📦 Mahsulot: ${order.amount} ${order.type === 'pubg_uc' ? 'UC' : 'PP'}\n` +
-      `💰 Summa: ${order.price.toLocaleString()} so'm\n` +
+      `👤 Foydalanuvchi: [${ctx.from.first_name || 'Foydalanuvchi'}](tg://user?id=${userId})\n` +
+      `📦 Mahsulot: ${amount} ${productType}\n` +
+      `🎮 O'yin ID: ${gameId}\n` +
+      `💰 Narxi: ${price.toLocaleString()} so'm\n` +
       `👤 Admin: ${ctx.from.first_name}\n` +
       `⏰ Vaqt: ${new Date().toLocaleString()}`,
       { 
         parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: [] } // Remove buttons after rejection
+        reply_markup: { inline_keyboard: [] } // Tugmalarni olib tashlash
       }
     );
+    
+    // Buyurtmani o'chirish
+    delete pendingOrders[orderId];
+    
   } catch (error) {
-    console.error('Bekor qilishda xatolik:', error);
+    console.error('Buyurtmani bekor qilishda xatolik:', error);
     await ctx.answerCbQuery('Xatolik yuz berdi!');
+    await ctx.reply(`❌ Xatolik: ${error.message}`);
   }
 });
 
@@ -3806,19 +3804,49 @@ bot.action(/confirm_order:(\w+)/, async (ctx) => {
     // Balansdan pul yechish
     updateUserBalance(userId, -price);
     
-    // Foydalanuvchiga xabar
-    const userMessage = `✅ Sizning buyurtmangiz tasdiqlandi!\n\n` +
-      `📦 Turi: ${type === 'premium' ? 'Telegram Premium' : 'Telegram Stars'}\n` +
-      `🔢 Miqdor: ${amount} ${type === 'premium' ? 'oy' : 'stars'}\n` +
-      `💰 Hisobingizdan yechildi: ${price.toLocaleString()} so'm\n\n` +
-      `📝 Iltimos, kuting. Tez orada sizga yuboriladi.`;
-    
-    await ctx.telegram.sendMessage(userId, userMessage);
-    
-    // Buyurtmani o'chirish
-    delete pendingOrders[orderId];
-    
-    await ctx.reply(`✅ Buyurtma tasdiqlandi va foydalanuvchi hisobidan ${price.toLocaleString()} so'm yechib olindi.`);
+    try {
+      // Foydalanuvchiga xabar
+      const userMessage = `✅ *Buyurtmangiz tasdiqlandi!*\n\n` +
+        `📦 *Mahsulot:* ${type === 'premium' ? 'Telegram Premium' : 'Telegram Stars'}\n` +
+        `🔢 *Miqdor:* ${amount} ${type === 'premium' ? 'oy' : 'stars'}\n` +
+        `💰 *Narxi:* ${price.toLocaleString()} so'm\n` +
+        `💳 *Hisobingizdan yechildi:* ${price.toLocaleString()} so'm\n` +
+        `📊 *Qolgan balansingiz:* ${(userBalance - price).toLocaleString()} so'm\n\n` +
+        `🔄 *Ish jarayonida...*\n` +
+        `⏳ Iltimos, kuting. Tez orada sizga yuboriladi.\n\n` +
+        `📞 *Aloqa:* @d1yor_salee`;
+      
+      // Send message to user
+      await ctx.telegram.sendMessage(
+        userId, 
+        userMessage,
+        { parse_mode: 'Markdown' }
+      );
+      
+      // Update admin message with confirmation
+      await ctx.editMessageText(
+        `${ctx.callbackQuery.message.text}\n\n` +
+        `✅ *Tasdiqlandi*\n` +
+        `👤 Admin: @${ctx.from.username || 'noma\'lum'}\n` +
+        `🕒 Sana: ${new Date().toLocaleString()}`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: [] } // Remove buttons after confirmation
+        }
+      );
+      
+      // Log the successful confirmation
+      console.log(`Order ${orderId} confirmed by admin ${ctx.from.id}`);
+      
+    } catch (error) {
+      console.error('Error sending confirmation to user:', error);
+      await ctx.answerCbQuery('❌ Xatolik yuz berdi!', true);
+      await ctx.reply(`❌ Xatolik: Foydalanuvchiga xabar yuborib bo\'lmadi.\nFoydalanuvchi ID: ${userId}\nXatolik: ${error.message}`);
+      return;
+    } finally {
+      // Always delete the order from pending orders
+      delete pendingOrders[orderId];
+    }
     
   } catch (error) {
     console.error('Buyurtmani tasdiqlashda xatolik:', error);
@@ -3851,7 +3879,9 @@ bot.action(/cancel_order:(\w+)/, async (ctx) => {
       `📦 Turi: ${type === 'premium' ? 'Telegram Premium' : 'Telegram Stars'}\n` +
       `🔢 Miqdor: ${amount} ${type === 'premium' ? 'oy' : 'stars'}\n` +
       `💰 Summa: ${price.toLocaleString()} so'm\n\n` +
-      `ℹ️ Iltimos, qaytadan urinib ko'ring yoki admin bilan bog'laning.`
+      `ℹ Sabab: Admin tomonidan bekor qilindi\n` +
+      `📞 Savollar bo'lsa: @d1yor_salee`,
+      { parse_mode: 'Markdown' }
     );
     
     // Buyurtmani o'chirish
@@ -4098,47 +4128,53 @@ bot.on('text', async (ctx, next) => {
     return;
   }
   
-    // Handle username input for Stars/Premium purchase
+    // Handle username/ID input for purchases
   if (ctx.session && ctx.session.buying) {
     const { type, amount, price } = ctx.session.buying;
     const userId = ctx.from.id;
-    const username = ctx.message.text.trim();
+    const gameId = ctx.message.text.trim();
     
-    // Validate username format
-    if (!username.startsWith('@')) {
-      await ctx.reply('❌ Iltimos, usernameni @ belgisi bilan kiriting. Masalan: @username');
+    // Validate game ID format
+    if (!gameId) {
+      await ctx.reply('❌ Iltimos, o\'yin ID yoki foydalanuvchi nomini kiriting.');
       return;
     }
     
     // Generate order ID
     const orderId = generateOrderId();
     
+    // Determine product name based on type
+    let productName = '';
+    if (type === 'pubg_uc') productName = 'PUBG Mobile UC';
+    else if (type === 'pubg_pp') productName = 'PUBG Mobile PP';
+    else if (type === 'premium') productName = 'Telegram Premium';
+    else productName = 'Noma\'lum';
+    
     // Save order to pending orders
     pendingOrders[orderId] = {
       userId,
       type,
       amount,
-      username,
+      gameId,
       price,
       timestamp: new Date().toISOString()
     };
     
-    // Deduct balance
-    updateUserBalance(userId, -price);
-    
     // Create order details message
     const orderDetails = `🆔 Buyurtma: #${orderId}\n` +
-      `👤 Foydalanuvchi: ${username} (ID: ${userId})\n` +
-      `📦 Mahsulot: ${type === 'premium' ? 'Telegram Premium' : 'Telegram Stars'}\n` +
-      `🔢 Miqdor: ${amount} ${type === 'premium' ? 'oy' : 'stars'}\n` +
+      `👤 Foydalanuvchi: [${ctx.from.first_name || 'Foydalanuvchi'}](tg://user?id=${userId}) (ID: ${userId})\n` +
+      `🎮 O'yin ID: ${gameId}\n` +
+      `📦 Mahsulot: ${productName}\n` +
+      `🔢 Miqdor: ${amount} ${type.endsWith('_uc') ? 'UC' : type.endsWith('_pp') ? 'PP' : ''}\n` +
       `💰 Narxi: ${price.toLocaleString()} so'm`;
     
     // Notify user
     await ctx.reply(
       `✅ Buyurtmangiz qabul qilindi!\n\n` +
-      `${orderDetails}\n\n` +
+      `${orderDetails.replace(/\*/g, '')}\n\n` +
       `🔄 Buyurtmangiz tekshirish uchun adminga yuborildi.\n` +
-      `⏳ Iltimos, tasdiqlanishini kuting.`
+      `⏳ Iltimos, tasdiqlanishini kuting.`,
+      { parse_mode: 'Markdown' }
     );
     
     // Notify admin
@@ -4157,8 +4193,8 @@ bot.on('text', async (ctx, next) => {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: '✅ Tasdiqlash', callback_data: `confirm_order:${orderId}` },
-                  { text: '❌ Rad etish', callback_data: `cancel_order:${orderId}` }
+                  { text: '✅ Tasdiqlash', callback_data: `confirm_pubg:${orderId}:${userId}` },
+                  { text: '❌ Rad etish', callback_data: `reject_pubg:${orderId}:${userId}` }
                 ]
               ]
             }
