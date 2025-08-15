@@ -22,6 +22,17 @@
     "balance": 0,
     "last_updated": "2025-08-12T07:35:10.766Z"
   },
+  "2087450631": {
+    "id": 2087450631,
+    "username": "abduraxmonovvw",
+    "first_name": "Абдирахмонов 🖤",
+    "last_name": "",
+    "language_code": "uz",
+    "is_bot": false,
+    "join_date": "2025-08-14T07:08:20.233Z",
+    "balance": 0,
+    "last_updated": "2025-08-14T07:08:20.233Z"
+  },
   "5735723011": {
     "id": 5735723011,
     "username": "suxacyber",
@@ -29,10 +40,10 @@
     "last_name": "",
     "language_code": "en",
     "is_bot": false,
-    "last_seen": "2025-08-12T09:39:23.706Z",
+    "last_seen": "2025-08-15T11:38:54.786Z",
     "join_date": "2025-08-11T15:33:12.569Z",
-    "balance": 100000,
-    "last_updated": "2025-08-11T16:25:21.530Z"
+    "balance": 38363,
+    "last_updated": "2025-08-15T11:42:20.899Z"
   },
   "7250754904": {
     "id": 7250754904,
@@ -46,15 +57,15 @@
   },
   "7990502958": {
     "id": 7990502958,
-    "username": "Garand_adminim",
+    "username": "d1yor_salee",
     "first_name": "𝗗 𝗜 𝗬 𝗢 𝗥_𝘀𝗮𝗹𝗲𝗲",
-    "last_name": "15:19",
+    "last_name": "15:03",
     "language_code": "uz",
     "is_bot": false,
     "join_date": "2025-08-11T18:28:15.430Z",
     "balance": 0,
     "last_updated": "2025-08-11T18:28:15.448Z",
-    "last_seen": "2025-08-12T10:20:50.230Z"
+    "last_seen": "2025-08-15T10:03:43.775Z"
   },
   "6647157968": {
     "id": 6647157968,
@@ -190,9 +201,9 @@
     "language_code": "uz",
     "is_bot": false,
     "join_date": "2025-08-12T07:35:10.701Z",
-    "balance": 1000,
-    "last_updated": "2025-08-12T09:41:10.893Z",
-    "last_seen": "2025-08-12T10:20:50.236Z"
+    "balance": 10001000,
+    "last_updated": "2025-08-14T12:40:27.104Z",
+    "last_seen": "2025-08-14T12:16:32.776Z"
   },
   "7882754857": {
     "id": 7882754857,
@@ -216,5 +227,65 @@
     "join_date": "2025-08-12T09:51:14.755Z",
     "balance": 0,
     "last_updated": "2025-08-12T09:51:14.755Z"
+  },
+  "7449629090": {
+    "id": 7449629090,
+    "username": "Me_usernameee",
+    "first_name": "🇽 🇺 🇩 🇴 🇾 🇧 🇪 🇷 🇩 🇮 🇾 🇪 🇻",
+    "last_name": "",
+    "language_code": "uz",
+    "is_bot": false,
+    "join_date": "2025-08-14T07:08:20.103Z",
+    "balance": 0,
+    "last_updated": "2025-08-14T07:08:20.103Z"
+  },
+  "7692508837": {
+    "id": 7692508837,
+    "username": "",
+    "first_name": "Турдиев",
+    "last_name": "Нодирбек",
+    "language_code": "uz",
+    "is_bot": false,
+    "join_date": "2025-08-14T07:08:22.460Z",
+    "balance": 0,
+    "last_updated": "2025-08-14T07:08:22.460Z",
+    "last_seen": "2025-08-14T07:31:22.388Z"
+  },
+  "7977047774": {
+    "balance": 10000,
+    "last_updated": "2025-08-14T12:30:23.739Z"
+  },
+  "8169993814": {
+    "id": 8169993814,
+    "username": "thomasbrat",
+    "first_name": "Thomas",
+    "last_name": "",
+    "language_code": "ru",
+    "is_bot": false,
+    "join_date": "2025-08-14T12:36:35.087Z",
+    "balance": 0,
+    "last_updated": "2025-08-14T12:36:35.087Z"
+  },
+  "7012791297": {
+    "id": 7012791297,
+    "username": "",
+    "first_name": "y",
+    "last_name": "",
+    "language_code": "uz",
+    "is_bot": false,
+    "join_date": "2025-08-15T10:03:43.771Z",
+    "balance": 0,
+    "last_updated": "2025-08-15T10:03:43.771Z"
+  },
+  "7857042412": {
+    "id": 7857042412,
+    "username": "Ooooooooo66",
+    "first_name": "UMIDJON",
+    "last_name": "",
+    "language_code": "uz",
+    "is_bot": false,
+    "join_date": "2025-08-15T10:03:43.774Z",
+    "balance": 0,
+    "last_updated": "2025-08-15T10:03:43.774Z"
   }
 }
