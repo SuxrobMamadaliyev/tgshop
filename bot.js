@@ -1,7 +1,15 @@
+console.log('=== Loading bot.js ===');
+console.log('Loading dependencies...');
+
 const { Telegraf, Markup, Scenes, session } = require('telegraf');
 const fs = require('fs');
 const path = require('path');
+
+console.log('Loading environment variables...');
 require('dotenv').config();
+
+console.log('Environment variables loaded in bot.js');
+console.log('BOT_TOKEN exists:', !!process.env.BOT_TOKEN);
 
 // Create and configure the bot
 const createBot = () => {
