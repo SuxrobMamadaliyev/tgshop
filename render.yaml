@@ -5,16 +5,55 @@ services:
     buildCommand: npm install
     startCommand: npm start
     envVars:
+      - key: NODE_ENV
+        value: production
+      - key: RENDER
+        value: "true"
       - key: BOT_TOKEN
         fromService:
           name: onerinchimijoz
-          type: web
-          envVarKey: BOT_TOKEN
-      - key: RENDER
-        value: "true"
-      - key: RENDER_EXTERNAL_URL
+          type: secret
+      - key: UZCARD_NUMBER
         fromService:
           name: onerinchimijoz
-          type: web
-          property: url
+          type: secret
+      - key: HUMO_NUMBER
+        fromService:
+          name: onerinchimijoz
+          type: secret
+      - key: ADMIN_ID1
+        fromService:
+          name: onerinchimijoz
+          type: secret
+      - key: ADMIN_ID2
+        fromService:
+          name: onerinchimijoz
+          type: secret
+      - key: CHANNEL_1_USERNAME
+        fromService:
+          name: onerinchimijoz
+          type: secret
+      - key: CHANNEL_1_LINK
+        fromService:
+          name: onerinchimijoz
+          type: secret
+      - key: CHANNEL_2_USERNAME
+        fromService:
+          name: onerinchimijoz
+          type: secret
+      - key: CHANNEL_2_LINK
+        fromService:
+          name: onerinchimijoz
+          type: secret
     plan: free
+    autoDeploy: true
+          name: onerinchimijoz
+          type: secret
+      - key: CHANNEL_2_LINK
+        fromService:
+          name: onerinchimijoz
+          type: secret
+      - key: RENDER
+        value: "true"
+      - key: NODE_ENV
+        value: production
