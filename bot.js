@@ -5,18 +5,49 @@ require('dotenv').config();
 
 // Create and configure the bot
 const createBot = () => {
-  const bot = new Telegraf(process.env.BOT_TOKEN);
+  const bot = new Telegraf(process.env.BOT_TOKEN, {
+    telegram: { webhookReply: false }
+  });
   
   // Define MENU_IMAGE path
   const MENU_IMAGE = path.join(__dirname, 'menu.jpg');
-
-// Global variables for user data
-if (!global.referrals) {
-  global.referrals = {}; // Store referral data
-}
-if (!global.existingUsers) {
-  global.existingUsers = new Set(); // Track existing users
-}
+  
+  // Store original handleUpdate method
+  const originalHandleUpdate = bot.handleUpdate.bind(bot);
+  
+  // Override handleUpdate to handle webhook responses
+  bot.handleUpdate = async (update) => {
+    try {
+      if (!update || !update.update_id) {
+        console.error('Invalid update received:', update);
+        return false;
+      }
+      
+      console.log('Handling update:', update.update_id);
+      await originalHandleUpdate(update);
+      console.log('Successfully processed update:', update.update_id);
+      return true;
+    } catch (err) {
+      console.error('Error handling update:', err);
+      return false;
+    }
+  };
+  
+  // Add error handler
+  bot.catch((err, ctx) => {
+    console.error('Bot error:', err);
+    return ctx.reply('An error occurred while processing your request.');
+  });
+  
+  // Initialize global variables
+  if (!global.referrals) {
+    global.referrals = {}; // Store referral data
+  }
+  if (!global.existingUsers) {
+    global.existingUsers = new Set(); // Track existing users
+  }
+  
+  return bot;
 
 // Foydalanuvchilar ma'lumotlarini yuklash
 function loadUsers() {
