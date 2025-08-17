@@ -4633,9 +4633,23 @@ bot.on('text', async (ctx, next) => {
     });
   }
   
-  // Enable graceful stop
-  process.once('SIGINT', () => bot.stop('SIGINT'));
-  process.once('SIGTERM', () => bot.stop('SIGTERM'));
+  // Enable graceful stop with error handling
+const handleShutdown = (signal) => {
+  try {
+    if (bot && typeof bot.stop === 'function') {
+      bot.stop(signal);
+    } else {
+      console.log('Bot not running, exiting...');
+      process.exit(0);
+    }
+  } catch (error) {
+    console.error('Error during shutdown:', error);
+    process.exit(1);
+  }
+};
+
+process.once('SIGINT', () => handleShutdown('SIGINT'));
+process.once('SIGTERM', () => handleShutdown('SIGTERM'));
   
   return bot;
 };
