@@ -1,61 +1,90 @@
-console.log('=== Loading bot.js ===');
-console.log('Loading dependencies...');
-
-const { Telegraf, Markup, Scenes, session } = require('telegraf');
+const { Telegraf, Markup, session } = require('telegraf');
+require('dotenv').config();
 const fs = require('fs');
 const path = require('path');
 
-console.log('Loading environment variables...');
-require('dotenv').config();
+// Rate limiting
+const rateLimit = new Map();
+const RATE_LIMIT_WINDOW = 2000; // 2 seconds
+const RATE_LIMIT_MAX = 3; // Max messages per window
 
-console.log('Environment variables loaded in bot.js');
-console.log('BOT_TOKEN exists:', !!process.env.BOT_TOKEN);
+// Function to check rate limit
+function checkRateLimit(userId) {
+  const now = Date.now();
+  const userTimestamps = rateLimit.get(userId) || [];
+  
+  // Remove timestamps older than the current window
+  const recentTimestamps = userTimestamps.filter(timestamp => now - timestamp < RATE_LIMIT_WINDOW);
+  
+  // Check if user is over the limit
+  if (recentTimestamps.length >= RATE_LIMIT_MAX) {
+    return false; // Rate limited
+  }
+  
+  // Add current timestamp and update the map
+  recentTimestamps.push(now);
+  rateLimit.set(userId, recentTimestamps);
+  return true; // Not rate limited
+}
 
-// Create and configure the bot
-const createBot = () => {
-  const bot = new Telegraf(process.env.BOT_TOKEN, {
-    telegram: { webhookReply: false }
-  });
-  
-  // Define MENU_IMAGE path
-  const MENU_IMAGE = path.join(__dirname, 'menu.jpg');
-  
-  // Store original handleUpdate method
-  const originalHandleUpdate = bot.handleUpdate.bind(bot);
-  
-  // Override handleUpdate to handle webhook responses
-  bot.handleUpdate = async (update) => {
-    try {
-      if (!update || !update.update_id) {
-        console.error('Invalid update received:', update);
-        return false;
-      }
-      
-      console.log('Handling update:', update.update_id);
-      await originalHandleUpdate(update);
-      console.log('Successfully processed update:', update.update_id);
-      return true;
-    } catch (err) {
-      console.error('Error handling update:', err);
-      return false;
+// Function to escape MarkdownV2 special characters
+function escapeMarkdownV2(text) {
+  if (!text) return '';
+  return String(text).replace(/[_*[\]()~`>#+\-={}.!]/g, '\\$&');
+}
+
+// Define the path to the menu image
+const MENU_IMAGE = path.join(__dirname, 'menu.jpg');
+
+// Botni yaratamiz
+const bot = new Telegraf(process.env.BOT_TOKEN);
+
+// Middleware to check rate limit and channel subscription
+bot.use(async (ctx, next) => {
+  try {
+    // Skip if it's not a message or doesn't have a user ID
+    if (!ctx.message || !ctx.from) return next();
+    
+    const userId = ctx.from.id;
+    
+    // Check rate limit
+    if (!checkRateLimit(userId)) {
+      console.log(`Rate limit exceeded for user ${userId}`);
+      return; // Skip processing this message
     }
-  };
-  
-  // Add error handler
-  bot.catch((err, ctx) => {
-    console.error('Bot error:', err);
-    return ctx.reply('An error occurred while processing your request.');
-  });
-  
-  // Initialize global variables
-  if (!global.referrals) {
-    global.referrals = {}; // Store referral data
+    
+    // List of required channels (add your channel usernames here)
+    const requiredChannels = ['HOLYUCSERVIS', 'starschatim'];
+    
+    // Check channel subscription
+    for (const channel of requiredChannels) {
+      try {
+        const member = await ctx.telegram.getChatMember(`@${channel}`, userId);
+        if (member.status === 'left' || member.status === 'kicked') {
+          console.log(`User ${userId} is not subscribed to @${channel}`);
+          await ctx.reply(`Iltimos, avval @${channel} kanaliga obuna bo'ling !`);
+          return; // Skip processing if not subscribed
+        }
+      } catch (error) {
+        console.error(`Error checking subscription to @${channel}:`, error);
+      }
+    }
+    
+    // Continue to the next middleware/handler
+    return next();
+  } catch (error) {
+    console.error('Middleware error:', error);
+    return next(); // Continue to next middleware even if there's an error
   }
-  if (!global.existingUsers) {
-    global.existingUsers = new Set(); // Track existing users
-  }
-  
-  return bot;
+});
+
+// Global variables for user data
+if (!global.referrals) {
+  global.referrals = {}; // Store referral data
+}
+if (!global.existingUsers) {
+  global.existingUsers = new Set(); // Track existing users
+}
 
 // Foydalanuvchilar ma'lumotlarini yuklash
 function loadUsers() {
@@ -1021,7 +1050,7 @@ async function sendAccountMenu(ctx) {
 
 // --- Sozlamalar ---
 const UC_CHANNEL_URL = 'https://t.me/HOLYUCSERVIS';
-const ADMIN_USER = '@Garand_adminim';
+const ADMIN_USER = '@d1yor_salee';
 const ADMIN_IDS = [process.env.ADMIN_ID1, process.env.ADMIN_ID2].filter(Boolean).map(Number); // admin ID lari
 
 // Ensure ADMIN_IDS has valid values
@@ -1214,7 +1243,7 @@ bot.action(/admin_(confirm|cancel):(.+)/, async (ctx) => {
           `🆔 Buyurtma ID: ${order.id}\n` +
           `📦 Mahsulot: ${order.type === 'premium' ? `Telegram Premium ${order.amount} oy` : `${order.amount} Stars`}\n` +
           `💰 Narxi: ${order.price.toLocaleString()} so'm\n\n` +
-          `📞 Aloqa: @Garand_adminim`
+          `📞 Aloqa: @d1yor_salee`
         );
       } catch (error) {
         console.error('Error notifying user:', error);
@@ -1256,7 +1285,7 @@ bot.action(/admin_(confirm|cancel):(.+)/, async (ctx) => {
           `🆔 Buyurtma ID: ${order.id}\n` +
           `💰 ${order.price.toLocaleString()} so'm hisobingizga qaytarildi.\n\n` +
           `❓ Sabab: Admin tomonidan bekor qilindi\n` +
-          `📞 Aloqa: @Garand_adminim`
+          `📞 Aloqa: @d1yor_salee`
         );
       } catch (error) {
         console.error('Error notifying user:', error);
@@ -2229,24 +2258,39 @@ bot.action(/admin:(.+)/, async (ctx) => {
           return lastSeen && lastSeen >= thirtyDaysAgo;
         }).length;
         
-        // Initialize orders array if it doesn't exist
-        if (!global.orders) {
+        // Initialize and ensure orders is an array
+        if (!Array.isArray(global.orders)) {
+          console.log('Initializing orders array as it was not an array');
           global.orders = [];
         }
         
-        const allOrders = global.orders || [];
+        // Ensure all orders have required fields
+        const allOrders = global.orders
+          .filter(order => order && typeof order === 'object')
+          .map(order => ({
+            ...order,
+            status: order.status || 'unknown',
+            price: Number(order.price) || 0,
+            timestamp: order.timestamp || new Date(0).toISOString()
+          }));
+          
         const totalOrders = allOrders.length;
         const completedOrders = allOrders.filter(o => o.status === 'completed');
-        const totalRevenue = completedOrders.reduce((sum, order) => sum + (order.price || 0), 0);
+        const totalRevenue = completedOrders.reduce((sum, order) => sum + order.price, 0);
         
         // Count today's orders and revenue
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const todayOrders = completedOrders.filter(order => {
-          const orderDate = order.timestamp ? new Date(order.timestamp) : null;
-          return orderDate && orderDate >= today;
+          try {
+            const orderDate = order.timestamp ? new Date(order.timestamp) : null;
+            return orderDate && orderDate >= today;
+          } catch (e) {
+            console.error('Error processing order date:', e);
+            return false;
+          }
         });
-        const todayRevenue = todayOrders.reduce((sum, order) => sum + (order.price || 0), 0);
+        const todayRevenue = todayOrders.reduce((sum, order) => sum + order.price, 0);
         
         // Count pending top-ups (if you have this feature)
         const pendingTopUps = 0; // Initialize to 0 if you don't have this feature
@@ -2592,6 +2636,31 @@ bot.on('text', async (ctx, next) => {
   }
 });
 
+// Handle broadcast cancellation
+bot.action('cancel_broadcast', async (ctx) => {
+  if (!isAdmin(ctx)) {
+    await ctx.answerCbQuery('Ruxsat yo\'q!');
+    return;
+  }
+
+  try {
+    // Clean up session
+    ctx.session.awaitingBroadcast = false;
+    delete ctx.session.broadcastState;
+    
+    // Send confirmation to admin
+    await ctx.editMessageText(
+      '❌ Xabar yuborish bekor qilindi.',
+      Markup.inlineKeyboard([
+        Markup.button.callback('◀️ Admin paneliga qaytish', 'back:admin')
+      ])
+    );
+  } catch (error) {
+    console.error('Error cancelling broadcast:', error);
+    await ctx.answerCbQuery('❌ Xatolik yuz berdi!');
+  }
+});
+
 // Handle broadcast confirmation
 bot.action('confirm_broadcast', async (ctx) => {
   if (!isAdmin(ctx) || !ctx.session.broadcastState?.message) {
@@ -2908,7 +2977,7 @@ bot.action('topup:check_payment', async (ctx) => {
       `✅ To'lov so'rovingiz qabul qilindi.\n` +
       `💰 Summa: ${amount.toLocaleString()} so'm\n` +
       `🆔 Buyurtma ID: ${paymentId}\n\n` +
-      `📞 To'lov tez orada tasdiqlanadi. Agar uzoq vaqt kutib tursangiz, @Garand_adminim ga murojaat qiling.`,
+      `📞 To'lov tez orada tasdiqlanadi. Agar uzoq vaqt kutib tursangiz, @d1yor_salee ga murojaat qiling.`,
       [[Markup.button.callback('⬅️ Asosiy menyu', 'back:account')]]
     );
     
@@ -2971,7 +3040,7 @@ bot.action(/confirm_payment:(\w+):(\d+):(\d+)/, async (ctx) => {
         '💰 Summa: ' + escapeMarkdown(amount.toLocaleString()) + ' so\'m\n' +
         '💳 Yangi balans: ' + escapeMarkdown(userBalance.toLocaleString()) + ' so\'m\n' +
         '🆔 Buyurtma ID: `' + paymentId + '`\n\n' +
-        '📞 Murojaat uchun: @Garand_adminim';
+        '📞 Murojaat uchun: @d1yor_salee';
       
       console.log('Foydalanuvchiga yuborilayotgan xabar:', {
         userId,
@@ -2996,7 +3065,7 @@ bot.action(/confirm_payment:(\w+):(\d+):(\d+)/, async (ctx) => {
             '💰 Summa: ' + amount.toLocaleString() + ' so\'m\n' +
             '💳 Yangi balans: ' + userBalance.toLocaleString() + ' so\'m\n' +
             '🆔 Buyurtma ID: ' + paymentId + '\n\n' +
-            '📞 Murojaat uchun: @suxacyber';
+            '📞 Murojaat uchun: @d1yor_salee';
             
           await ctx.telegram.sendMessage(userId, simpleMessage);
           console.log('2-usul: Oddiy formatdagi xabar yuborildi');
@@ -3074,7 +3143,7 @@ bot.action(/reject_payment:(\w+):(\d+)/, async (ctx) => {
         '❌ *To\'lov rad etildi\!*\n\n' +
       '🆔 Buyurtma ID: `' + paymentId + '`\n' +
       '❌ Sabab: To\'lov ma\'lumotlari noto\'g\'ri yoki to\'lov amalga oshirilmagan\.\n\n' +
-      'ℹ️ Iltimos, to\'lovni qayta amalga oshiring yoki @suxacyber ga murojaat qiling\.',
+      'ℹ️ Iltimos, to\'lovni qayta amalga oshiring yoki @d1yor_salee ga murojaat qiling\.',
       { 
         parse_mode: 'MarkdownV2',
         reply_markup: {
@@ -3090,7 +3159,7 @@ bot.action(/reject_payment:(\w+):(\d+)/, async (ctx) => {
       try {
         await ctx.telegram.sendMessage(
           userId,
-          `❌ To'lov rad etildi! Iltimos, @suxacyber ga murojaat qiling.`,
+          `❌ To'lov rad etildi! Iltimos, @d1yor_salee ga murojaat qiling.`,
           { parse_mode: 'Markdown' }
         );
       } catch (e) {
@@ -3443,7 +3512,7 @@ bot.on('text', async (ctx, next) => {
       `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
       `💰 Joriy balans: *${userBalance.toLocaleString()} so'm*\n\n` +
       `🆔 Buyurtma raqami: *${orderId}*\n` +
-      `📞 Aloqa: @suxacyber\n\n` +
+      `📞 Aloqa: @d1yor_salee\n\n` +
       `💡 Iltimos, to'lovni tasdiqlash uchun adminlarimiz kuting.`,
       { parse_mode: 'Markdown' }
     );
@@ -3761,6 +3830,25 @@ bot.on('text', async (ctx, next) => {
   return next();
 });
 
+// /start komandasi uchun handler
+bot.command('start', async (ctx) => {
+  try {
+    // Avval obunani tekshirish
+    const checkResult = await checkUserSubscription(ctx);
+    
+    // Agar obuna bo'lmagan bo'lsa, obuna bo'lish sahifasiga yo'naltirish
+    if (!checkResult.subscribed) {
+      return await sendSubscriptionMessage(ctx, checkResult);
+    }
+    
+    // Aks holda asosiy menyuni ko'rsatish
+    return await sendMainMenu(ctx);
+  } catch (error) {
+    console.error('Start command error:', error);
+    await ctx.reply('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
+  }
+});
+
 // Obunani tekshirish
 bot.action('check_subscription', async (ctx) => {
   try {
@@ -3894,18 +3982,47 @@ const sendSubscriptionMessage = async (ctx, checkResult = null) => {
     
     message += 'Botdan to\'liq foydalanish uchun quyidagi kanallarga a\'zo bo\'ling:\n\n';
     
-    const buttons = channels.map(channel => [
-      Markup.button.url(`📢 ${channel.username} kanaliga obuna bo'lish`, channel.link)
+    // Create inline keyboard with channel buttons
+    const inlineKeyboard = [];
+    
+    // Add each channel as an inline URL button
+    channels.forEach(channel => {
+      inlineKeyboard.push([
+        { text: `📢 ${channel.username} kanali`, url: channel.link }
+      ]);
+    });
+    
+    // Add check subscription button
+    inlineKeyboard.push([
+      { text: '✅ Obunani tekshirish', callback_data: 'check_subscription' }
     ]);
     
-    buttons.push([Markup.button.callback('✅ Obunani tekshirish', 'check_subscription')]);
-    
-    await sendOrUpdateMenu(
-      ctx,
-      message +
-      'Botdan foydalanish uchun quyidagi kanallarga obuna bo\'lishingiz kerak:',
-      buttons
-    );
+    // Send the message with inline keyboard
+    try {
+      await ctx.telegram.sendMessage(
+        ctx.chat.id,
+        message + 'Quyidagi tugmalar orqali kanallarga obuna bo\'ling:',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: inlineKeyboard
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Xabar yuborishda xatolik:', error);
+      // Fallback to old method if inline keyboard fails
+      const buttons = channels.map(channel => [
+        Markup.button.url(`📢 ${channel.username} kanaliga obuna bo'lish`, channel.link)
+      ]);
+      buttons.push([Markup.button.callback('✅ Obunani tekshirish', 'check_subscription')]);
+      
+      await sendOrUpdateMenu(
+        ctx,
+        message + 'Quyidagi kanallarga obuna bo\'ling:',
+        buttons
+      );
+    }
   } catch (error) {
     console.error('Obuna xabarini yuborishda xatolik:', error);
     // Xatolik yuz berganda ham foydalanuvchiga tushunarli xabar qaytaramiz
@@ -3989,7 +4106,7 @@ bot.action(/confirm_pubg:(\w+):(\d+)/, async (ctx) => {
       `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
       `💰 Qolgan balans: *${(userBalance - price).toLocaleString()} so'm*\n\n` +
       `📦 Buyurtmangiz tez orada yetkazib beriladi.\n` +
-      `📞 Savollar bo'lsa: @suxacyber`,
+      `📞 Savollar bo'lsa: @d1yor_salee`,
       { parse_mode: 'Markdown' }
     );
     
@@ -4054,7 +4171,7 @@ bot.action(/reject_pubg:(\w+):(\d+)/, async (ctx) => {
         `💰 Summa: *${order.price.toLocaleString()} so'm*\n` +
         `⏰ Sana: ${new Date().toLocaleString()}\n\n` +
         `ℹ Sabab: Admin tomonidan bekor qilindi\n` +
-        `📞 Savollar bo'lsa: @suxacyber`,
+        `📞 Savollar bo'lsa: @d1yor_salee`,
         { parse_mode: 'Markdown' }
       );
     } catch (error) {
@@ -4364,7 +4481,7 @@ bot.on('text', async (ctx, next) => {
           `📦 Mahsulot: ${type === 'premium' ? `Telegram Premium ${amount} oy` : `${amount} Stars`}\n` +
           `👤 Foydalanuvchi: ${username}\n` +
           `💰 Narxi: ${price.toLocaleString()} so'm\n\n` +
-          `Ishonch xizmati: @Garand_adminim`);
+          `Ishonch xizmati: @d1yor_salee`);
         
         // Store the order information for admin confirmation
         const order = {
@@ -4663,35 +4780,35 @@ bot.on('text', async (ctx, next) => {
 
 // O'yin narxlari menyusi va handlerlari o'chirildi
 
-  // Start the bot in development mode if not using webhooks
-  if (process.env.RENDER !== 'true') {
-    bot.launch().then(() => {
-      console.log('Bot is running in development mode...');
-    }).catch((err) => {
-      console.error('Error starting bot:', err);
-    });
-  }
-  
-  // Enable graceful stop with error handling
-const handleShutdown = (signal) => {
-  try {
-    if (bot && typeof bot.stop === 'function') {
-      bot.stop(signal);
-    } else {
-      console.log('Bot not running, exiting...');
-      process.exit(0);
-    }
-  } catch (error) {
-    console.error('Error during shutdown:', error);
-    process.exit(1);
-  }
-};
+ // Launch the bot only in polling mode when webhook is not configured
+ const hasWebhookBaseUrl = !!(process.env.WEBHOOK_URL || process.env.RENDER_EXTERNAL_URL);
+ let BOT_LAUNCHED = false;
+ if (!hasWebhookBaseUrl) {
+   bot.launch()
+     .then(() => {
+       BOT_LAUNCHED = true;
+       console.log('Bot launched in polling mode');
+     })
+     .catch((err) => {
+       console.error('Failed to launch bot in polling mode:', err);
+     });
+ }
 
-process.once('SIGINT', () => handleShutdown('SIGINT'));
-process.once('SIGTERM', () => handleShutdown('SIGTERM'));
-  
-  return bot;
-};
+  // Graceful shutdown
+ process.once('SIGINT', () => {
+   try {
+     if (BOT_LAUNCHED) bot.stop('SIGINT');
+   } catch (e) {
+     console.error('Error stopping bot on SIGINT:', e);
+   }
+ });
+ process.once('SIGTERM', () => {
+   try {
+     if (BOT_LAUNCHED) bot.stop('SIGTERM');
+   } catch (e) {
+     console.error('Error stopping bot on SIGTERM:', e);
+   }
+ });
 
-// Create and export the bot instance
-module.exports = createBot();
+ // Export bot for server.js to attach webhook
+ module.exports = bot;
