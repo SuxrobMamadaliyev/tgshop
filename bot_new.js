@@ -153,23 +153,47 @@ function saveUserInfo(userData) {
 }
 
 // Dastur ishga tushganda foydalanuvchilarni yuklash
-const users = loadUsers();
+let users = {};
+
+try {
+  users = loadUsers();
+  console.log(`Dastur ishga tushdi. ${Object.keys(users).length} ta foydalanuvchi yuklandi.`);
+  
+  // Dastur ishga tushganda foydalanuvchilar ma'lumotlarini saqlash
+  saveUsers(users);
+  console.log('Foydalanuvchilar ma\'lumotlari saqlandi.');
+} catch (error) {
+  console.error('Dastur ishga tushirilayotganda xatolik yuz berdi:', error);
+  // Bo'sh foydalanuvchilar obyektini yaratamiz
+  users = {};
+  saveUsers(users);
+}
 
 // Har 1 daqiqada foydalanuvchilarni saqlash
 setInterval(() => {
   try {
     const currentUsers = loadUsers();
     // Faqat yangi o'zgarishlarni saqlash
-    saveUsers({...currentUsers, ...users});
+    const updatedUsers = {...currentUsers, ...users};
+    saveUsers(updatedUsers);
+    users = updatedUsers; // Update the in-memory users object
+    console.log('Foydalanuvchilar ma\'lumotlari avtomatik saqlandi.');
   } catch (error) {
-    console.error('Error in auto-save:', error);
+    console.error('Avtomatik saqlashda xatolik:', error);
   }
 }, 60 * 1000);
 
 // Dastur to'xtatilganda foydalanuvchilarni saqlash
 process.on('SIGINT', () => {
-  saveUsers(users);
-  process.exit();
+  console.log('Dastur to\'xtatilmoqda. Foydalanuvchilar ma\'lumotlari saqlanmoqda...');
+  try {
+    saveUsers(users);
+    console.log('Foydalanuvchilar ma\'lumotlari muvaffaqiyatli saqlandi.');
+  } catch (error) {
+    console.error('Dastur to\'xtatilayotganda xatolik yuz berdi:', error);
+  } finally {
+    process.exit();
+  }
 });
 
 // Start komandasi
@@ -2246,67 +2270,65 @@ bot.action(/admin:(.+)/, async (ctx) => {
       }
       
       try {
-        // Load users from the database
+        // Foydalanuvchilarni yuklash
         const users = loadUsers();
-        const totalUsers = Object.keys(users).length;
+        const userIds = Object.keys(users);
+        const totalUsers = userIds.length;
         
-        // Count active users (users who were active in the last 30 days)
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        const activeUsers = Object.values(users).filter(user => {
-          const lastSeen = user.last_seen ? new Date(user.last_seen) : null;
-          return lastSeen && lastSeen >= thirtyDaysAgo;
-        }).length;
+        // Statistikani hisoblash uchun o'zgaruvchilar
+        let activeUsers = 0;
+        let totalBalance = 0;
+        let usersWithBalance = 0;
+        let newUsersToday = 0;
+        let totalReferrals = 0;
         
-        // Initialize and ensure orders is an array
-        if (!Array.isArray(global.orders)) {
-          console.log('Initializing orders array as it was not an array');
-          global.orders = [];
-        }
-        
-        // Ensure all orders have required fields
-        const allOrders = global.orders
-          .filter(order => order && typeof order === 'object')
-          .map(order => ({
-            ...order,
-            status: order.status || 'unknown',
-            price: Number(order.price) || 0,
-            timestamp: order.timestamp || new Date(0).toISOString()
-          }));
-          
-        const totalOrders = allOrders.length;
-        const completedOrders = allOrders.filter(o => o.status === 'completed');
-        const totalRevenue = completedOrders.reduce((sum, order) => sum + order.price, 0);
-        
-        // Count today's orders and revenue
+        // Bugungi sana
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const todayOrders = completedOrders.filter(order => {
-          try {
-            const orderDate = order.timestamp ? new Date(order.timestamp) : null;
-            return orderDate && orderDate >= today;
-          } catch (e) {
-            console.error('Error processing order date:', e);
-            return false;
+        
+        // 30 kun oldingi sana
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        
+        // Har bir foydalanuvchi uchun statistikani hisoblaymiz
+        for (const userId of userIds) {
+          const user = users[userId];
+          
+          // Balansni hisoblaymiz
+          const balance = parseFloat(user.balance) || 0;
+          totalBalance += balance;
+          
+          // Balansi bor foydalanuvchilarni hisoblaymiz
+          if (balance > 0) usersWithBalance++;
+          
+          // Faol foydalanuvchilarni hisoblaymiz (oxirgi 30 kun ichida faol bo'lganlar)
+          if (user.last_seen) {
+            const lastSeen = new Date(user.last_seen);
+            if (lastSeen >= thirtyDaysAgo) activeUsers++;
           }
-        });
-        const todayRevenue = todayOrders.reduce((sum, order) => sum + order.price, 0);
+          
+          // Bugungi yangi foydalanuvchilarni hisoblaymiz
+          if (user.join_date) {
+            const joinDate = new Date(user.join_date);
+            if (joinDate >= today) newUsersToday++;
+          }
+          
+          // Referral orqali kelganlarni hisoblaymiz
+          if (user.referrer) totalReferrals++;
+        }
         
-        // Count pending top-ups (if you have this feature)
-        const pendingTopUps = 0; // Initialize to 0 if you don't have this feature
+        // Kutilayotgan to'lovlar (agar mavjud bo'lsa)
+        const pendingTopUps = 0; // Agar sizda bu ma'lumot bo'lsa, uni qo'shing
         
-        // Format statistics message
+        // Statistikani formatlaymiz
         const statsMessage = `📊 *Bot Statistikasi*\n\n` +
           `👥 *Umumiy foydalanuvchilar:* ${totalUsers.toLocaleString()} ta\n` +
-          `🔄 *Faol foydalanuvchilar (30 kun):* ${activeUsers.toLocaleString()} ta\n\n` +
-          `📦 *Buyurtmalar:*\n` +
-          `   • Jami: ${totalOrders.toLocaleString()} ta\n` +
-          `   • Bugungi: ${todayOrders.length.toLocaleString()} ta\n` +
-          `   • Tugallangan: ${completedOrders.length.toLocaleString()} ta\n\n` +
-          `💰 *Daromad:*\n` +
-          `   • Jami: ${totalRevenue.toLocaleString()} so'm\n` +
-          `   • Bugungi: ${todayRevenue.toLocaleString()} so'm\n\n` +
-          `⏳ *Kutilayotgan to'lovlar:* ${pendingTopUps} ta\n`;
+          `🔄 *Faol foydalanuvchilar (30 kun):* ${activeUsers.toLocaleString()} ta\n` +
+          `💰 *Jami balanslar yig\'indisi:* ${Math.floor(totalBalance).toLocaleString()} so'm\n` +
+          `👥 *Balansi bor foydalanuvchilar:* ${usersWithBalance.toLocaleString()} ta\n` +
+          `📈 *Bugungi yangi foydalanuvchilar:* ${newUsersToday.toLocaleString()} ta\n` +
+          `🤝 *Referral orqali kelganlar:* ${totalReferrals.toLocaleString()} ta\n` +
+          `⏳ *Kutilayotgan to'lovlar:* ${pendingTopUps} ta`;
         
         const keyboard = [
           [Markup.button.callback('🔄 Yangilash', 'admin:stats')],
