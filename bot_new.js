@@ -228,31 +228,6 @@ const UC_PRICES = {
   '16200': 2200000
 };
 
-
-// --- Free Fire Diamond narxlari ---
-const FF_DIAMOND_PRICES = {
-  '105': 15000,    // 105 yoki 180 Diamond
-  '210': 30000,    // 210 yoki 285 Diamond
-  '326': 45000,    // 326 yoki 559 Diamond
-  '431': 60000,    // 431 yoki 664 Diamond
-  '546': 75000,    // 546 yoki 936 Diamond
-  '651': 90000,    // 651 yoki 1041 Diamond
-  '756': 105000,   // 756 yoki 1262 Diamond
-  '872': 120000,   // 872 yoki 1262 Diamond
-  '1113': 150000,  // 1113 yoki 1980 Diamond
-  '1439': 195000,  // 1439 yoki 2306 Diamond
-  '1659': 230000,  // 1659 yoki 2528 Diamond
-  '1985': 275000,  // 1985 yoki 4033 Diamond
-  '2398': 315000,  // 2398 yoki 4033 Diamond
-  '2944': 395000,  // 2944 yoki 4033 Diamond
-  '3511': 470000,  // 3511 yoki 5146 Diamond
-  '4074': 550000,  // 4074 yoki 6431 Diamond
-  '4796': 645000,  // 4796 yoki 6431 Diamond
-  '6160': 700000,  // 6160 yoki 10360 Diamond
-  '12320': 1400000, // 12320 yoki 16520 Diamond
-  '24640': 2700000  // 24640 yoki 28840 Diamond
-};
-
 // --- PUBG Mobile PP narxlari (kengaytirilgan) ---
 const PP_PRICES = {
   '1000': 2520,
@@ -812,66 +787,14 @@ bot.action(/menu:(.+)/, async (ctx) => {
   }
 });
 
-// Free Fire Diamond sotib olish bosqichi
-bot.action('freefire:menu', async (ctx) => {
-  await sendFreeFireMenu(ctx);
-});
-
-// Free Fire Diamond paketini tanlash
-bot.action(/^freefire:buy:(\d+):(\d+)$/, async (ctx) => {
-  try {
-    const amount = parseInt(ctx.match[1]);
-    const price = parseInt(ctx.match[2]);
-    const userId = ctx.from.id;
-    const userBalance = getUserBalance(userId);
-
-    if (userBalance < price) {
-      return sendFreeFireMenu(
-        ctx,
-        `⚠️ *Xatolik!*\n\nSizning balansingizda yetarli mablag' mavjud emas.\n` +
-        `💳 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n` +
-        `💰 Kerakli summa: *${price.toLocaleString()} so'm*\n\n` +
-        `Iltimos, hisobingizni to'ldiring yoki kichikroq miqdordagi Diamond tanlang.`
-      );
-    }
-
-    // Save purchase data to session
-    ctx.session.purchase = {
-      type: 'freefire',
-      amount: amount,
-      price: price,
-      step: 'username'
-    };
-
-    // Ask for game username
-    return sendOrUpdateMenu(
-      ctx,
-      `🎮 *Free Fire Diamond Sotib Olish*\n\n` +
-      `💰 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n` +
-      `📦 Miqdor: *${amount} Diamond*\n\n` +
-      `ℹ Iltimos, o'yindagi to'liq foydalanuvchi nomingizni yozing.`,
-      [[Markup.button.callback('⬅️ Orqaga', 'freefire:menu')]]
-    );
-  } catch (error) {
-    console.error('Diamond paketini tanlashda xatolik:', error);
-    await ctx.reply('⚠️ Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
-    return sendFreeFireMenu(ctx);
-  }
-});
-
 // PUBG Mobile UC sotib olish bosqichi
 bot.action('pubg:buy_uc', async (ctx) => {
   await sendUcMenu(ctx);
 });
 
-// PUBG// Handle back button for PUBG menu
-bot.action('back:pubg', async (ctx) => {
-  await sendPubgMenu(ctx);
-});
-
-// Handle back button for Free Fire menu
-bot.action('back:freefire', async (ctx) => {
-  await sendFreeFireMenu(ctx);
+// PUBG Mobile PP sotib olish bosqichi
+bot.action('pubg:buy_pp', async (ctx) => {
+  await sendPpMenu(ctx);
 });
 
 // UC paketini tanlash
@@ -998,6 +921,137 @@ bot.action('admin:addChannel', async (ctx) => {
     }
   );
 });
+
+
+// Free Fire UC packages (similar to PUBG)
+const FREE_FIRE_UC_PACKAGES = {
+  '60': 5000,
+  '325': 25000,
+  '660': 50000,
+  '1800': 130000,
+  '3850': 250000,
+  '8100': 500000,
+  '12000': 750000
+};
+
+function sendFreeFireMenu(ctx) {
+  const keyboard = [
+    [Markup.button.callback('💎 UC Sotib Olish', 'freefire:buy_uc')],
+    [Markup.button.callback('⬅️ Orqaga', 'back:main')]
+  ];
+  return sendOrUpdateMenu(ctx, '🔥 Free Fire - Xizmatlar', keyboard);
+}
+
+function sendPubgMenu(ctx) {
+  const keyboard = [
+    [Markup.button.callback('💎 UC Sotib Olish', 'pubg:buy_uc')],
+    [Markup.button.callback('⭐ PP Sotib Olish', 'pubg:buy_pp')],
+    [Markup.button.callback('⬅️ Orqaga', 'back:main')]
+  ];
+  return sendOrUpdateMenu(ctx, '🎮 PUBG Mobile - Xizmatlar', keyboard);
+}
+
+// Free Fire UC sotib olish menyusi
+async function sendFreeFireUcMenu(ctx, customMessage = '') {
+  const userId = ctx.from.id;
+  const userBalance = getUserBalance(userId);
+  
+  // Show all packages without balance check
+  const keyboard = [];
+  
+  for (const [uc, price] of Object.entries(FREE_FIRE_UC_PACKAGES)) {
+    const buttonText = `${uc} UC - ${price.toLocaleString()} so'm`;
+    
+    keyboard.push([
+      Markup.button.callback(
+        buttonText,
+        `freefire:uc:${uc}:${price}`
+      )
+    ]);
+  }
+  
+  // Add back button
+  keyboard.push([
+    Markup.button.callback('⬅️ Orqaga', 'back:freefire')
+  ]);
+  
+  // Prepare the message
+  let message = `🔥 Free Fire UC Sotib Olish\n\n`;
+  message += `💳 UC paketlaridan birini tanlang:`;
+  
+  return sendOrUpdateMenu(ctx, message, keyboard);
+}
+
+// UC sotib olish menyusi
+async function sendUcMenu(ctx, customMessage = '') {
+  const userId = ctx.from.id;
+  const userBalance = getUserBalance(userId);
+  
+  // Show all packages without balance check
+  const keyboard = [];
+  
+  for (const [uc, price] of Object.entries(UC_PRICES)) {
+    const buttonText = `${uc} UC - ${price.toLocaleString()} so'm`;
+    
+    keyboard.push([
+      Markup.button.callback(
+        buttonText,
+        `pubg:uc:${uc}:${price}`
+      )
+    ]);
+  }
+  
+  // Add back button
+  keyboard.push([
+    Markup.button.callback('⬅️ Orqaga', 'back:pubg')
+  ]);
+  
+  // Prepare the message
+  let message = `💎 UC Sotib Olish\n\n`;
+  message += `💳 UC paketlaridan birini tanlang:`;
+  
+  return sendOrUpdateMenu(ctx, message, keyboard);
+}
+
+// PP sotib olish menyusi
+async function sendPpMenu(ctx, customMessage = '') {
+  const userId = ctx.from.id;
+  const userBalance = getUserBalance(userId);
+  
+  // Show all packages without balance check
+  const keyboard = [];
+  
+  for (const [pp, price] of Object.entries(PP_PRICES)) {
+    const buttonText = `${pp} PP - ${price.toLocaleString()} so'm`;
+    
+    keyboard.push([
+      Markup.button.callback(
+        buttonText,
+        `pubg:pp:${pp}:${price}`
+      )
+    ]);
+  }
+  
+  // Add top-up and back buttons
+  keyboard.push([
+    Markup.button.callback('💳 Hisobni to\'ldirish', 'topup:amount')
+  ]);
+  keyboard.push([
+    Markup.button.callback('⬅️ Orqaga', 'back:pubg')
+  ]);
+  
+  // Prepare the message
+  let message = `⭐ PP Sotib Olish\n\n`;
+  message += `💰 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n`;
+  message += `💳 PP paketlaridan birini tanlang:`;
+  
+  // Add custom message if provided (like insufficient balance message)
+  if (customMessage) {
+    message = customMessage + '\n\n' + message;
+  }
+  
+  return sendOrUpdateMenu(ctx, message, keyboard);
+}
 
 // Premium yoki Stars tanlash
 // Premium narxlarini ko'rsatamiz
@@ -1583,6 +1637,9 @@ bot.action(/^menu:(.+)/, async (ctx) => {
       case 'PUBG Mobile UC / PP':
         await sendPubgMenu(ctx);
         break;
+      case 'Free Fire UC':
+        await sendFreeFireMenu(ctx);
+        break;
       case 'UC Shop':
         await sendUCShop(ctx);
         break;
@@ -1625,7 +1682,6 @@ bot.action(/^back:(.+)/, async (ctx) => {
       case 'pubg':
         await sendPubgMenu(ctx);
         break;
-        
       case 'freefire':
         await sendFreeFireMenu(ctx);
         break;
@@ -1935,6 +1991,8 @@ bot.action(/admin:message_user:(\d+):(\d+)/, async (ctx) => {
   // Set flag to indicate we're waiting for a message
   ctx.session.awaitingUserMessage = true;
 });
+
+
 
 // Stars narxlari
 bot.action('admin:starsPrices', async (ctx) => {
@@ -2578,1997 +2636,241 @@ bot.action(/admin:(.+)/, async (ctx) => {
         broadcastKeyboard,
         { parse_mode: 'Markdown' }
       );
-      break;
-  }
+    }
 });
 
-// Handle text messages for broadcast
+// Handle game ID input for UC purchase
 bot.on('text', async (ctx, next) => {
-  // Skip if not from admin or not awaiting broadcast
-  if (!isAdmin(ctx) || !ctx.session.awaitingBroadcast) {
-    return next();
-  }
-  
   try {
-    const message = ctx.message.text;
-    const users = loadUsers();
-    const userIds = Object.keys(users);
+    // Skip if not in purchase flow
+    if (!ctx.session?.purchase || ctx.session.purchase.step !== 'game_id') {
+      return next();
+    }
+
+    const gameId = ctx.message.text.trim();
     
-    if (userIds.length === 0) {
-      await ctx.reply('❌ Hech qanday foydalanuvchi topilmadi!');
-      ctx.session.awaitingBroadcast = false;
-      delete ctx.session.broadcastState;
-      return;
+    // Basic validation for game ID (numbers only)
+    if (!/^\d+$/.test(gameId)) {
+      return ctx.reply('❌ Noto\'g\'ri ID formati. Iltimos, faqat raqamlardan foydalaning.');
     }
     
-    // Create confirmation keyboard
+    // Store game ID and move to next step
+    ctx.session.purchase.gameId = gameId;
+    ctx.session.purchase.step = 'confirm';
+    
+    // Show confirmation message
+    const { type, amount, price } = ctx.session.purchase;
+    const gameName = type === 'freefire_uc' ? 'Free Fire' : 'PUBG';
+    
+    const message = `🛒 Buyurtma tafsilotlari:\n` +
+      `🎮 O'yin: ${gameName}\n` +
+      `💎 Miqdor: ${amount} UC\n` +
+      `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+      `🆔 O'yin ID: ${gameId}\n\n` +
+      `✅ Buyurtmani tasdiqlaysizmi?`;
+    
     const keyboard = [
       [
-        Markup.button.callback('✅ Ha, yuborish', 'confirm_broadcast'),
-        Markup.button.callback('❌ Bekor qilish', 'cancel_broadcast')
+        Markup.button.callback('✅ Tasdiqlash', 'confirm_purchase'),
+        Markup.button.callback('❌ Bekor qilish', 'cancel_purchase')
       ]
     ];
     
-    // Store message in session
-    ctx.session.broadcastState = {
-      step: 'confirm',
-      message: message,
-      totalUsers: userIds.length
-    };
-    
-    // Show preview and ask for confirmation
-    await ctx.reply(
-      `📝 *Xabar ko\'rinishi:*\n\n${message}\n\n` +
-      `📊 Jami ${userIds.length} ta foydalanuvchiga yuboriladi. Xabarni yuborishni tasdiqlaysizmi?`,
-      {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: keyboard }
-      }
-    );
-    
+    return ctx.reply(message, Markup.inlineKeyboard(keyboard));
   } catch (error) {
-    console.error('Xabar yuborishda xatolik:', error);
-    await ctx.reply('❌ Xatolik yuz berdi. Iltimos qaytadan urinib ko\'ring.');
-    ctx.session.awaitingBroadcast = false;
-    delete ctx.session.broadcastState;
-  }
-});
-
-// Handle broadcast cancellation
-bot.action('cancel_broadcast', async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-
-  try {
-    // Clean up session
-    ctx.session.awaitingBroadcast = false;
-    delete ctx.session.broadcastState;
-    
-    // Send confirmation to admin
-    await ctx.editMessageText(
-      '❌ Xabar yuborish bekor qilindi.',
-      Markup.inlineKeyboard([
-        Markup.button.callback('◀️ Admin paneliga qaytish', 'back:admin')
-      ])
-    );
-  } catch (error) {
-    console.error('Error cancelling broadcast:', error);
-    await ctx.answerCbQuery('❌ Xatolik yuz berdi!');
-  }
-});
-
-// Handle broadcast confirmation
-bot.action('confirm_broadcast', async (ctx) => {
-  if (!isAdmin(ctx) || !ctx.session.broadcastState?.message) {
-    await ctx.answerCbQuery('Xatolik yuz berdi!');
-    return;
-  }
-  
-  const broadcastText = ctx.session.broadcastState.message;
-  
-  try {
-    // Send a confirmation to admin
-    const processingMsg = await ctx.reply('📡 Xabar foydalanuvchilarga yuborilmoqda... Iltimos, kuting.');
-    
-    // Get all users from the database
-    const users = loadUsers();
-    const usersToNotify = Object.keys(users);
-    
-    if (usersToNotify.length === 0) {
-      await ctx.answerCbQuery('❌ Hech qanday foydalanuvchi topilmadi!');
-      return;
-    }
-    
-    let successCount = 0;
-    let failCount = 0;
-    
-    // Store message IDs for possible deletion
-    const messageIds = {};
-    
-    // Send to each user with progress updates
-    const totalUsers = usersToNotify.length;
-    let processed = 0;
-    
-    for (const userId of usersToNotify) {
-      try {
-        const sentMessage = await ctx.telegram.sendMessage(
-          userId, 
-          `📢 *Xabar adminstratsiyadan:*\n\n${broadcastText}`, 
-          { 
-            parse_mode: 'Markdown',
-            reply_markup: {
-              inline_keyboard: [
-                [Markup.button.callback('❌ Xabarni yopish', 'delete_message')]
-              ]
-            }
-          }
-        );
-        
-        // Store message ID for possible deletion
-        messageIds[userId] = sentMessage.message_id;
-        successCount++;
-        
-        // Update progress every 5 users
-        processed++;
-        if (processed % 5 === 0) {
-          const progress = Math.floor((processed / totalUsers) * 100);
-          try {
-            await ctx.telegram.editMessageText(
-              ctx.chat.id,
-              processingMsg.message_id,
-              null,
-              `📡 Xabar yuborilmoqda...\n` +
-              `🔄 ${processed}/${totalUsers} (${progress}%)`
-            );
-          } catch (e) {
-            console.error('Progress yangilashda xatolik:', e);
-          }
-        }
-        
-        // Small delay to avoid hitting rate limits
-        await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (error) {
-        console.error(`Xabar yuborishda xatolik (${userId}):`, error);
-        failCount++;
-      }
-    }
-    
-    // Update broadcast state with message IDs
-    if (ctx.session.broadcastState) {
-      ctx.session.broadcastState.messageIds = messageIds;
-    }
-    
-    // Update the admin with results
-    const resultText = `✅ Xabar muvaffaqiyatli yuborildi!\n\n` +
-      `✓ Muvaffaqiyatli: ${successCount} ta\n` +
-      `✗ Xatolik: ${failCount} ta\n\n` +
-      `📝 Xabar matni:\n${broadcastText}\n\n` +
-      `❌ *Barcha xabarlarni o'chirish* tugmasi orqali yuborilgan xabarlarni bekor qilishingiz mumkin.`;
-    
-    const keyboard = [
-      [Markup.button.callback('❌ Barcha xabarlarni o\'chirish', 'cancel_broadcast')],
-      [Markup.button.callback('◀️ Orqaga', 'back:admin')]
-    ];
-    
-    try {
-      await ctx.telegram.editMessageText(
-        ctx.chat.id,
-        processingMsg.message_id,
-        null,
-        resultText,
-        { 
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: keyboard }
-        }
-      );
-    } catch (editError) {
-      console.error('Xabarni yangilashda xatolik:', editError);
-      await ctx.reply(resultText, { 
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: keyboard }
-      });
-    }
-    
-  } catch (error) {
-    console.error('Xabar yuborishda xatolik:', error);
-    await ctx.reply('❌ Xabar yuborishda xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
-  }
-});
-
-// Handle message deletion by users
-bot.action('delete_message', async (ctx) => {
-  try {
-    await ctx.deleteMessage();
-  } catch (error) {
-    console.error('Xabarni o\'chirishda xatolik:', error);
-    await ctx.answerCbQuery('❌ Xabarni o\'chirib bo\'lmadi', true);
-  }
-});
-
-async function sendUCShop(ctx) {
-  await ctx.answerCbQuery();
-  await sendOrUpdateMenu(ctx, 'UC Shop kanalimizga o\'ting:', [
-    [Markup.button.url('➡️ Kanalga o\'tish', UC_CHANNEL_URL)],
-    [Markup.button.callback('⬅️ Orqaga', 'back:main')]
-  ]);
-}
-
-async function sendSOS(ctx) {
-  await ctx.answerCbQuery();
-  // Escape special characters in the admin username for Markdown
-  const escapedAdmin = ADMIN_USER.replace(/[_*`[\]()~>#+=|{}.!-]/g, '\\$&');
-  await sendOrUpdateMenu(ctx, `👤 Admin: ${escapedAdmin}`, [
-    [Markup.button.callback('⬅️ Orqaga', 'back:main')]
-  ], { parse_mode: 'Markdown' });
-}
-
-async function promptPromokod(ctx) {
-  await ctx.answerCbQuery();
-  ctx.session.awaitingPromo = true;
-  await ctx.reply('Promokodni kiriting:');
-}
-
-// Top-up bosqichlari uchun handler
-bot.action('topup:amount', async (ctx) => {
-  ctx.session.topup = { step: 'amount' };
-  await sendOrUpdateMenu(ctx, '💵 Iltimos, to\'ldirmoqchi bo\'lgan summani kiriting (so\'mda):', [
-    [Markup.button.callback('⬅️ Orqaga', 'back:account')]
-  ]);
-});
-
-// Orqaga hisob menyusiga qaytish
-bot.action('back:account', async (ctx) => {
-  await sendAccountMenu(ctx);
-});
-
-// Orqaga admin paneliga qaytish
-bot.action('back:admin', async (ctx) => {
-  await sendAdminPanel(ctx);
-});
-
-// Channel management menu
-bot.action('admin:channelMenu', async (ctx) => {
-  await sendAdminChannelMenu(ctx);
-});
-
-// To'ldirish summasini qabul qilish
-bot.on('text', async (ctx, next) => {
-  // Agar topup jarayoni boshlamagan bo'lsa, keyingi middlewarega o'tkazamiz
-  if (!ctx.session.topup) {
-    return next();
-  }
-
-  const userId = ctx.from.id;
-  const text = ctx.message.text.trim();
-
-  // To'ldirish summasi
-  if (ctx.session.topup.step === 'amount') {
-    const amount = parseInt(text);
-    if (isNaN(amount) || amount < 1000) {
-      await ctx.reply('❌ Iltimos, 1000 so\'mdan ko\'proq summa kiriting!');
-      return;
-    }
-
-    ctx.session.topup = {
-      step: 'method',
-      amount: amount
-    };
-
-    const keyboard = [
-      [Markup.button.callback('💳 Uzcard', 'topup:method:uzcard')],
-      [Markup.button.callback('💳 Humo', 'topup:method:humo')],
-      [Markup.button.callback('⬅️ Orqaga', 'back:account')]
-    ];
-
-    await sendOrUpdateMenu(ctx, `💳 To'lov usulini tanlang:\n💵 Summa: ${amount.toLocaleString()} so'm`, keyboard);
-  } else {
-    return next();
-  }
-});
-
-// To'lov usulini tanlash
-bot.action(/topup:method:(.+)/, async (ctx) => {
-  const method = ctx.match[1];
-  const { amount } = ctx.session.topup;
-  
-  // Get card information from environment
-  const cardInfo = getCardInfo();
-  
-  // To'lov kartalari ma'lumotlari
-  const cards = {
-    uzcard: {
-      number: process.env.UZCARD_NUMBER ? formatCardNumber(process.env.UZCARD_NUMBER) : '8600123456789012',
-      name: process.env.CARD_OWNER || 'Karta egasi',
-      type: 'Uzcard'
-    },
-    humo: {
-      number: process.env.HUMO_NUMBER ? formatCardNumber(process.env.HUMO_NUMBER) : '9860123456789012',
-      name: process.env.CARD_OWNER || 'Karta egasi',
-      type: 'Humo'
-    }
-  };
-
-  const card = cards[method];
-  const paymentAmount = amount; // No more 3% discount
-
-  const message = `💳 *${card.type} orqali to'lov*\n` +
-    `💳 Karta raqami: \`${card.number}\`\n` +
-    `👤 Karta egasi: ${card.name}\n\n` +
-    `💵 *To'lov summasi:* ${paymentAmount.toLocaleString()} so'm\n` +
-    `📝 *Izoh:* ${ctx.from.id}\n\n` +
-    `💡 Iltimos, to'lov qilgandan so'ng chek rasmini yuboring.\n` +
-    `🔄 To'lov tekshirilgach, balansingizga ${amount.toLocaleString()} so'm qo'shiladi.`;
-
-  const keyboard = [
-    [Markup.button.callback('✅ To\'lov qildim', 'topup:check_payment')],
-    [Markup.button.callback('❌ Bekor qilish', 'back:account')]
-  ];
-
-  await sendOrUpdateMenu(ctx, message, keyboard, { parse_mode: 'Markdown' });
-  ctx.session.topup.step = 'waiting_payment';
-  ctx.session.topup.method = method;
-  ctx.session.topup.paymentAmount = paymentAmount;
-});
-
-// To'lovni admin tasdiqlash uchun yuborish
-bot.action('topup:check_payment', async (ctx) => {
-  if (!ctx.session.topup) {
-    await ctx.answerCbQuery('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
-    return await sendAccountMenu(ctx);
-  }
-
-  const { amount, method, paymentAmount } = ctx.session.topup;
-  const userId = ctx.from.id;
-  const username = ctx.from.username || 'Foydalanuvchi';
-  
-  // Buyurtma ID yaratamiz
-  const paymentId = generateOrderId();
-  
-  // Adminlarga xabar yuboramiz
-  // Escape special characters for Markdown
-  const escapeMarkdown = (text) => {
-    return text.replace(/[_*[\]()~`>#+\-={}|.!]/g, '\\$&');
-  };
-
-  // Format message with MarkdownV2
-  const adminMessage = '💳 *Yangi to\'lov so\'rovi*\n' +
-    '👤 Foydalanuvchi: ' + escapeMarkdown('@' + username) + ' \\(' + 'ID: ' + userId + '\\)\n' +
-    '💰 Summa: ' + escapeMarkdown(amount.toLocaleString()) + ' so\'m\n' +
-    '💳 To\'lov usuli: ' + (method === 'uzcard' ? 'Uzcard' : 'Humo') + '\n' +
-    '💸 To\'lov summasi: ' + escapeMarkdown(paymentAmount.toLocaleString()) + ' so\'m\n' +
-    '📅 Sana: ' + escapeMarkdown(new Date().toLocaleString()) + '\n\n' +
-    '🆔 Buyurtma ID: `' + paymentId + '`';
-  
-  // Admin paneliga tasdiqlash tugmalari bilan yuboramiz
-  const adminKeyboard = [
-    [
-      Markup.button.callback('✅ Tasdiqlash', `confirm_payment:${paymentId}:${userId}:${amount}`),
-      Markup.button.callback('❌ Rad etish', `reject_payment:${paymentId}:${userId}`)
-    ]
-  ];
-  
-  try {
-    // Barcha adminlarga xabar yuboramiz
-    for (const adminId of ADMIN_IDS) {
-      try {
-        await ctx.telegram.sendMessage(
-          adminId,
-          adminMessage,
-          { parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: adminKeyboard } }
-        );
-      } catch (error) {
-        // Don't log sensitive info to console
-        await ctx.telegram.sendMessage(
-          ADMIN_IDS[0], // Send to first admin
-          `⚠️ Xatolik: Adminlarga xabar yuborishda muammo yuz berdi. Admin ID: ${adminId}`,
-          { parse_mode: 'Markdown' }
-        );
-      }
-    }
-    
-    // Foydalanuvchiga xabar beramiz
-    await ctx.answerCbQuery('To\'lovingiz adminlar tomonidan tekshirilmoqda. Iltimos, kuting...');
-    await sendOrUpdateMenu(
-      ctx,
-      `✅ To'lov so'rovingiz qabul qilindi.\n` +
-      `💰 Summa: ${amount.toLocaleString()} so'm\n` +
-      `🆔 Buyurtma ID: ${paymentId}\n\n` +
-      `📞 To'lov tez orada tasdiqlanadi. Agar uzoq vaqt kutib tursangiz, @d1yor_salee ga murojaat qiling.`,
-      [[Markup.button.callback('⬅️ Asosiy menyu', 'back:account')]]
-    );
-    
-    // Sessiyani tozalash
-    delete ctx.session.topup;
-    
-  } catch (error) {
-    // Don't log error details to console
-    await ctx.answerCbQuery('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
-    await sendAccountMenu(ctx);
-    // Notify admin about the error
-    await ctx.telegram.sendMessage(
-      ADMIN_IDS[0],
-      `⚠️ Xatolik: To'lov so'rovini qayta ishlashda muammo yuz berdi.\nFoydalanuvchi ID: ${ctx.from.id}`,
-      { parse_mode: 'Markdown' }
-    );
-  }
-});
-
-// Admin tomonidan to'lovni tasdiqlash
-bot.action(/confirm_payment:(\w+):(\d+):(\d+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-  
-  const paymentId = ctx.match[1];
-  const userId = parseInt(ctx.match[2]);
-  const amount = parseInt(ctx.match[3]);
-  const username = ctx.from.username || 'noma\'lum admin';
-  
-  try {
-    // Balansni yangilash
-    updateUserBalance(userId, amount);
-    
-    // Escape special characters for MarkdownV2
-    const escapeMarkdown = (text) => {
-      return String(text).replace(/[_*[\]()~`>#+\-={}|.!]/g, '\\$&');
-    };
-    
-    // Adminlarga xabar
-    await ctx.answerCbQuery('✅ To\'lov tasdiqlandi!');
-    try {
-      await ctx.editMessageText(
-        escapeMarkdown(ctx.update.callback_query.message.text) + '\n\n' +
-        '✅ *Tasdiqlandi*\n' +
-        '👤 Admin: ' + escapeMarkdown('@' + username) + '\n' +
-        '🕒 Sana: ' + escapeMarkdown(new Date().toLocaleString()),
-        { parse_mode: 'MarkdownV2' }
-      );
-    } catch (editError) {
-      console.error('Xabarni yangilashda xatolik:', editError);
-      await ctx.answerCbQuery('✅ To\'lov tasdiqlandi (xabarni yangilab bo\'lmadi)');
-    }
-    
-    // Foydalanuvchiga xabar
-    try {
-      const userBalance = getUserBalance(userId);
-      const userMessage = '✅ *To\'lov tasdiqlandi!*\\!\n\n' +
-        '💰 Summa: ' + escapeMarkdown(amount.toLocaleString()) + ' so\'m\n' +
-        '💳 Yangi balans: ' + escapeMarkdown(userBalance.toLocaleString()) + ' so\'m\n' +
-        '🆔 Buyurtma ID: `' + paymentId + '`\n\n' +
-        '📞 Murojaat uchun: @d1yor_salee';
-      
-      console.log('Foydalanuvchiga yuborilayotgan xabar:', {
-        userId,
-        message: userMessage,
-        balance: userBalance
-      });
-
-      // 1-usul: Oddiy xabar yuborish
-      try {
-        const sentMessage = await ctx.telegram.sendMessage(
-          userId,
-          userMessage,
-          { parse_mode: 'MarkdownV2' }
-        );
-        console.log('Xabar muvaffaqiyatli yuborildi:', sentMessage);
-      } catch (sendError) {
-        console.error('1-usul: Xabar yuborishda xatolik:', sendError);
-        
-        // 2-usul: Boshqa formatda yuborishga harakat qilamiz
-        try {
-          const simpleMessage = '✅ To\'lovingiz tasdiqlandi!\n\n' +
-            '💰 Summa: ' + amount.toLocaleString() + ' so\'m\n' +
-            '💳 Yangi balans: ' + userBalance.toLocaleString() + ' so\'m\n' +
-            '🆔 Buyurtma ID: ' + paymentId + '\n\n' +
-            '📞 Murojaat uchun: @d1yor_salee';
-            
-          await ctx.telegram.sendMessage(userId, simpleMessage);
-          console.log('2-usul: Oddiy formatdagi xabar yuborildi');
-        } catch (simpleError) {
-          console.error('2-usul ham ishlamadi:', simpleError);
-          throw simpleError; // Xatolikni yuqoriga yuboramiz
-        }
-      }
-      
-    } catch (error) {
-      console.error('Foydalanuvchiga xabar yuborishda xatolik:', error);
-      // Notify admin about the error
-      try {
-        await ctx.telegram.sendMessage(
-          ADMIN_IDS[0],
-          '⚠️ Xatolik: Foydalanuvchiga tasdiqlash xabarini yuborib bo\'lmadi\n' +
-          'Buyurtma ID: `' + paymentId + '`\n' +
-          'Foydalanuvchi ID: ' + userId + '\n' +
-          'Xatolik: ' + escapeMarkdown(error.message || 'Noma\'lum xatolik'),
-          { parse_mode: 'MarkdownV2' }
-        );
-      } catch (e) {
-        console.error('Adminlarga xabar yuborishda xatolik:', e);
-      }
-    }
-    
-  } catch (error) {
-    console.error('To\'lovni tasdiqlashda xatolik:', error);
-    try {
-      await ctx.answerCbQuery('❌ Xatolik yuz berdi!');
-    } catch (e) {}
-    
-    // Notify admin about the error
-    try {
-      await ctx.telegram.sendMessage(
-        ADMIN_IDS[0],
-        '⚠️ Xatolik: To\'lovni tasdiqlashda muammo yuz berdi\n' +
-        'Buyurtma ID: `' + paymentId + '`\n' +
-        'Foydalanuvchi ID: ' + userId + '\n' +
-        'Xatolik: ' + escapeMarkdown(error.message || 'Noma\'lum xatolik'),
-        { parse_mode: 'MarkdownV2' }
-      );
-    } catch (e) {
-      console.error('Adminlarga xabar yuborishda xatolik:', e);
-    }
-  }
-});
-
-// Admin tomonidan to'lovni rad etish
-bot.action(/reject_payment:(\w+):(\d+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-  
-  const paymentId = ctx.match[1];
-  const userId = parseInt(ctx.match[2]);
-  const username = ctx.from.username || 'noma\'lum admin';
-  
-  try {
-    // Adminlarga xabar
-    await ctx.answerCbQuery('❌ To\'lov rad etildi!');
-    await ctx.editMessageText(
-      `${ctx.update.callback_query.message.text}\n\n` +
-      `❌ *Rad etildi*\n` +
-      `👤 Admin: @${username}\n` +
-      `🕒 Sana: ${new Date().toLocaleString()}`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    // Foydalanuvchiga xabar
-    try {
-      await ctx.telegram.sendMessage(
-        userId,
-        '❌ *To\'lov rad etildi\!*\n\n' +
-      '🆔 Buyurtma ID: `' + paymentId + '`\n' +
-      '❌ Sabab: To\'lov ma\'lumotlari noto\'g\'ri yoki to\'lov amalga oshirilmagan\.\n\n' +
-      'ℹ️ Iltimos, to\'lovni qayta amalga oshiring yoki @d1yor_salee ga murojaat qiling\.',
-      { 
-        parse_mode: 'MarkdownV2',
-        reply_markup: {
-          inline_keyboard: [
-            [Markup.button.callback('💳 Qayta to\'lov qilish', 'topup:amount')],
-            [Markup.button.callback('📞 Yordam', 'support')]
-          ]
-        }
-      }
-      );
-    } catch (error) {
-      // Don't log error to console, try to send a simpler message
-      try {
-        await ctx.telegram.sendMessage(
-          userId,
-          `❌ To'lov rad etildi! Iltimos, @d1yor_salee ga murojaat qiling.`,
-          { parse_mode: 'Markdown' }
-        );
-      } catch (e) {
-        // Notify admin about the error using escaped text
-        await ctx.telegram.sendMessage(
-          ADMIN_IDS[0],
-          `⚠️ Xatolik: Foydalanuvchiga xabar yuborishda muammo yuz berdi.\nFoydalanuvchi ID: ${userId}`,
-          { parse_mode: 'Markdown' }
-        );
-      }
-    }
-    
-  } catch (error) {
-    console.error('To\'lovni rad etishda xatolik:', error);
-    try {
-      await ctx.answerCbQuery('❌ Xatolik yuz berdi!');
-      // Notify admin about the error using escaped text
-      // Notify admin about the error
-      await ctx.telegram.sendMessage(
-        ADMIN_IDS[0],
-        `⚠️ Xatolik: To'lovni rad etishda muammo yuz berdi.\nBuyurtma ID: ${paymentId}\nFoydalanuvchi ID: ${userId}`,
-        { parse_mode: 'Markdown' }
-      );
-    } catch (e) {
-      // If we can't send message to admin, there's not much we can do
-    }
-  }
-});
-
-// Matnli javoblar (Promokod va Admin panel)
-// Promokod kiritish bosqichi
-bot.action('use_promo', async (ctx) => {
-  ctx.session.awaitingPromo = true;
-  await ctx.reply('🔑 Promokodni kiriting:');
-});
-
-// Promokodni tekshirish
-// Function to format card number with spaces (e.g., 8600 1234 5678 9012)
-function formatCardNumber(number) {
-  if (!number) return '';
-  // Remove all non-digit characters
-  const digits = number.replace(/\D/g, '');
-  // Add space every 4 digits
-  return digits.replace(/(\d{4})(?=\d)/g, '$1 ');
-}
-
-// Function to get formatted card information
-function getCardInfo() {
-  const cardInfo = {
-    owner: process.env.CARD_OWNER || 'Mavjud emas',
-    uzcard: process.env.UZCARD_NUMBER ? formatCardNumber(process.env.UZCARD_NUMBER) : 'Mavjud emas',
-    humo: process.env.HUMO_NUMBER ? formatCardNumber(process.env.HUMO_NUMBER) : 'Mavjud emas'
-  };
-  
-  cardInfo.formatted = `💳 *Karta ma'lumotlari*\n` +
-    `👤 Egasi: ${cardInfo.owner}\n` +
-    `💳 Uzcard: \`${cardInfo.uzcard}\`\n` +
-    `💳 Humo: \`${cardInfo.humo}\``;
-    
-  return cardInfo;
-}
-
-// Function to get premium prices
-function getPremiumPrices() {
-  return {
-    1: parseInt(process.env.PREMIUM_1_MONTH) || 43000,
-    3: parseInt(process.env.PREMIUM_3_MONTHS) || 152000,
-    6: parseInt(process.env.PREMIUM_6_MONTHS) || 222000,
-    12: parseInt(process.env.PREMIUM_12_MONTHS) || 320000
-  };
-}
-
-// Function to get stars prices
-function getStarsPrices() {
-  return {
-    15: 3500,   // 15 stars - 3,500 so'm
-    25: 6000,   // 25 stars - 6,000 so'm
-    50: 12000,  // 50 stars - 12,000 so'm
-    100: 22000, // 100 stars - 22,000 so'm
-    150: 31000, // 150 stars - 31,000 so'm
-    200: 43000, // 200 stars - 43,000 so'm
-    300: 63000  // 300 stars - 63,000 so'm
-  };
-}
-// Function to update price in .env
-async function updatePrice(type, key, value) {
-  try {
-    const envVar = `${type.toUpperCase()}_${key}`.toUpperCase();
-    const updates = { [envVar]: value };
-    await updateEnvFile(updates);
-    return true;
-  } catch (error) {
-    console.error('Error updating price:', error);
-    return false;
-  }
-}
-
-// Function to update .env file
-function updateEnvFile(updates) {
-  return new Promise((resolve, reject) => {
-    try {
-      const envPath = path.join(__dirname, '.env');
-      
-      // Read the file asynchronously
-      fs.readFile(envPath, 'utf8', (err, data) => {
-        if (err) {
-          console.error('Error reading .env file:', err);
-          return reject(err);
-        }
-        
-        let envContent = data;
-        
-        // Update each key-value pair
-        Object.entries(updates).forEach(([key, value]) => {
-          const regex = new RegExp(`^${key}=.*`, 'm');
-          if (envContent.match(regex)) {
-            envContent = envContent.replace(regex, `${key}=${value}`);
-          } else {
-            envContent += `\n${key}=${value}`;
-          }
-          // Update process.env for current session
-          process.env[key] = value;
-        });
-        
-        // Write back to file asynchronously
-        fs.writeFile(envPath, envContent, 'utf8', (err) => {
-          if (err) {
-            console.error('Error writing to .env file:', err);
-            return reject(err);
-          }
-          console.log('Successfully updated .env file');
-          resolve();
-        });
-      });
-    } catch (error) {
-      console.error('Error in updateEnvFile:', error);
-      reject(error);
-    }
-  });
-}
-
-bot.on('text', async (ctx, next) => {
-  // Check if admin is editing card info
-  if (ctx.session.editingCardField) {
-    const field = ctx.session.editingCardField;
-    const value = ctx.message.text.trim();
-    
-    // Basic validation
-    if ((field === 'UZCARD_NUMBER' || field === 'HUMO_NUMBER') && !/^\d+$/.test(value)) {
-      await ctx.reply('❌ Noto\'g\'ri format! Faqat raqam kiriting.');
-      return;
-    }
-    
-    try {
-      // Update the .env file
-      updateEnvFile({ [field]: value });
-      
-      // Clear the editing state
-      delete ctx.session.editingCardField;
-      
-      // Send success message and return to card menu
-      await ctx.reply(`✅ ${field === 'CARD_OWNER' ? 'Karta egasi' : field === 'UZCARD_NUMBER' ? 'Uzcard raqami' : 'Humo raqami'} muvaffaqiyatli o'zgartirildi!`);
-      
-      // Show the updated card menu
-      const cardInfoText = `💳 *Karta ma'lumotlari*\n` +
-        `👤 Egasi: ${process.env.CARD_OWNER || 'Mavjud emas'}\n` +
-        `💳 Uzcard: \`${process.env.UZCARD_NUMBER || 'Mavjud emas'}\`\n` +
-        `💳 Humo: \`${process.env.HUMO_NUMBER || 'Mavjud emas'}\``;
-        
-      const cardMenuKeyboard = [
-        [Markup.button.callback('✏️ Karta egasini o\'zgartirish', 'admin:editCardOwner')],
-        [Markup.button.callback('💳 Uzcard raqamini o\'zgartirish', 'admin:editUzcard')],
-        [Markup.button.callback('💳 Humo raqamini o\'zgartirish', 'admin:editHumo')],
-        [Markup.button.callback('◀️ Orqaga', 'back:admin')]
-      ];
-      
-      await sendOrUpdateMenu(ctx, cardInfoText, cardMenuKeyboard, { parse_mode: 'Markdown' });
-      
-    } catch (error) {
-      console.error('Karta ma\'lumotlarini yangilashda xatolik:', error);
-      await ctx.reply('❌ Xatolik yuz berdi. Iltimos qaytadan urinib ko\'ring.');
-    }
-    return;
-  }
-  
-  // Check if admin is sending a message to a user
-  if (ctx.session.awaitingUserMessage && ctx.session.messageTargetUser) {
-    const targetUserId = ctx.session.messageTargetUser;
-    const message = ctx.message.text;
-    
-    try {
-      // Try to send the message to the user
-      await ctx.telegram.sendMessage(
-        targetUserId,
-        `📨 *Admin xabari:*\n\n${message}\n\n` +
-        `💬 Javob yozish uchun shu xabarga javob bosing.`,
-        { parse_mode: 'Markdown' }
-      );
-      
-      // Notify admin of success
-      await ctx.reply(`✅ Xabar foydalanuvchiga muvaffaqiyatli yuborildi!`);
-      
-      // Clean up session
-      delete ctx.session.awaitingUserMessage;
-      delete ctx.session.messageTargetUser;
-      
-      // Go back to find user menu
-      return sendAdminPanel(ctx);
-      
-    } catch (error) {
-      console.error('Xabar yuborishda xatolik:', error);
-      await ctx.reply('❌ Xabar yuborishda xatolik yuz berdi. Foydalanuvchi botni bloklagan yoki botni ishga tushirmagan bo\'lishi mumkin.');
-      
-      // Clean up session even if there was an error
-      delete ctx.session.awaitingUserMessage;
-      delete ctx.session.messageTargetUser;
-      
-      return sendAdminPanel(ctx);
-    }
-  }
-  
-  // Promokod kiritishni kutyapmiz
-  if (ctx.session.awaitingPromo) {
-    const promoCode = ctx.message.text.trim().toUpperCase();
-    const userId = ctx.from.id;
-    
-    // Check if it's a command
-    if (promoCode.startsWith('/')) {
-      return;
-    }
-    
-    const result = await checkPromoCode(promoCode);
-    
-    if (result.valid) {
-      // Promokod to'g'ri bo'lsa, balansga qo'shamiz
-      updateUserBalance(userId, result.amount);
-      const used = markPromoCodeAsUsed(promoCode, userId);
-      
-      if (used) {
-        // Foydalanuvchiga xabar beramiz
-        await ctx.reply(result.message);
-        
-        // Yangilangan balansni ko'rsatamiz
-        const userBalance = getUserBalance(userId);
-        await ctx.reply(`💰 Joriy balans: ${userBalance.toLocaleString()} so'm`);
-        
-        // Adminlarga xabar beramiz
-        const promo = promoCodeStorage.get(promoCode);
-        const remainingUses = promo ? promo.usesLeft : 0;
-        
-        for (const adminId of ADMIN_IDS) {
-          try {
-            await ctx.telegram.sendMessage(
-              adminId,
-              `🎫 *Yangi Promokod Ishlatildi*\n\n` +
-              `🔑 KOD: *${promoCode}*\n` +
-              `👤 Foydalanuvchi: [${ctx.from.first_name}](tg://user?id=${userId}) (ID: ${userId})\n` +
-              `💰 Summa: *${result.amount.toLocaleString()} so'm*\n` +
-              `🔄 Qolgan foydalanish: *${remainingUses} marta*`,
-              { parse_mode: 'Markdown' }
-            );
-          } catch (error) {
-            console.error('Adminlarga xabar yuborishda xatolik:', error);
-          }
-        }
-      } else {
-        await ctx.reply('❌ Ushbu promokodni allaqachon ishlatgansiz!');
-      }
-    } else {
-      await ctx.reply(result.message);
-    }
-    
-    ctx.session.awaitingPromo = false;
-    return;
-  }
-  // Check if user is in the process of buying UC/PP
-  if (ctx.session.buying && (ctx.session.buying.type === 'pubg_uc' || ctx.session.buying.type === 'pubg_pp')) {
-    const { type, amount, price } = ctx.session.buying;
-    const username = ctx.message.text.trim();
-    const productType = type === 'pubg_uc' ? 'UC' : 'PP';
-    const orderId = generateOrderId();
-    const userId = ctx.from.id;
-    const userBalance = getUserBalance(userId);
-    
-    // Verify user still has enough balance
-    if (userBalance < price) {
-      const neededAmount = price - userBalance;
-      const keyboard = [
-        [Markup.button.callback('💳 Hisobni to\'ldirish', 'topup:amount')],
-        [Markup.button.callback('⬅️ Orqaga', `pubg:buy_${type.split('_')[1]}`)]
-      ];
-      
-      return sendOrUpdateMenu(
-        ctx,
-        `⚠️ *Hisobingizda yetarli mablag' mavjud emas!*\n\n` +
-        `💳 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n` +
-        `💰 Tanlangan paket narxi: *${price.toLocaleString()} so'm*\n` +
-        `💵 Yetishmayotgan summa: *${neededAmount.toLocaleString()} so'm*\n\n` +
-        `ℹ Iltimos, hisobingizni to'ldiring yoki kichikroq miqdordagi ${productType} tanlang.`,
-        keyboard
-      );
-    }
-    
-    // Create order object
-    const order = {
-      type,
-      amount,
-      price,
-      username,
-      userId,
-      userName: ctx.from.first_name,
-      status: 'pending',
-      createdAt: new Date()
-    };
-    
-    // Initialize orders object if it doesn't exist
-    if (!ctx.session.orders) {
-      ctx.session.orders = {};
-    }
-    
-    // Store order in a global object instead of session
-    if (!global.orders) {
-      global.orders = {};
-    }
-    
-    // Store order with all necessary details
-    global.orders[orderId] = {
-      ...order,
-      orderId: orderId,
-      userName: ctx.from.first_name,
-      userId: ctx.from.id,
-      timestamp: new Date().toISOString(),
-      status: 'pending'
-    };
-    
-    // Also store in session for reference
-    if (!ctx.session.myOrders) {
-      ctx.session.myOrders = [];
-    }
-    ctx.session.myOrders.push(orderId);
-    
-    // Clear buying state
-    ctx.session.buying = null;
-    
-    // Send confirmation to user
-    await ctx.replyWithMarkdown(
-      `✅ Sotib olish so'rovi qabul qilindi!\n\n` +
-      `📦 Mahsulot: *${amount} ${productType}*\n` +
-      `👤 O'yinchi: *${username}*\n` +
-      `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
-      `💰 Joriy balans: *${userBalance.toLocaleString()} so'm*\n\n` +
-      `🆔 Buyurtma raqami: *${orderId}*\n` +
-      `📞 Aloqa: @d1yor_salee\n\n` +
-      `💡 Iltimos, to'lovni tasdiqlash uchun adminlarimiz kuting.`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    // Notify admin
-    const adminMessage = `🆕 *Yangi PUBG ${productType} Sotuv!*\n\n` +
-      `🆔 Buyurtma: #${orderId}\n` +
-      `👤 Foydalanuvchi: [${ctx.from.first_name}](tg://user?id=${ctx.from.id}) (ID: ${ctx.from.id})\n` +
-      `📱 O'yinchi: *${username}*\n` +
-      `📦 Miqdor: *${amount} ${productType}*\n` +
-      `💵 Narx: *${price.toLocaleString()} so'm*\n` +
-      `💰 Balans: *${userBalance.toLocaleString()} so'm*\n` +
-      `⏰ Vaqt: ${new Date().toLocaleString()}`;
-    
-    // Send to all admins
-    for (const adminId of ADMIN_IDS) {
-      try {
-        await bot.telegram.sendMessage(adminId, adminMessage, { 
-          parse_mode: 'Markdown',
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '✅ Tasdiqlash', callback_data: `confirm_pubg:${orderId}:${ctx.from.id}` },
-                { text: '❌ Bekor qilish', callback_data: `reject_pubg:${orderId}:${ctx.from.id}` }
-              ]
-            ]
-          }
-        });
-      } catch (err) {
-        console.error(`Failed to send message to admin ${adminId}:`, err);
-      }
-    }
-    
-    // Reset session
-    ctx.session.buying = null;
-    return sendMainMenu(ctx);
-  }
-
-  if (ctx.session.awaitingPromo) {
-    const code = ctx.message.text.trim();
-    ctx.session.awaitingPromo = false;
-    // Kodni tekshirish yoki bazaga yozish mumkin
-    await ctx.reply(`Promokod qabul qilindi: ${code}`);
-    return; // to'xtatamiz
-  }
-
-  // Admin: yangi promokod
-  if (ctx.session.awaitingNewPromo && isAdmin(ctx)) {
-    ctx.session.awaitingNewPromo = false;
-    const promo = ctx.message.text.trim();
-    // Promokodni saqlash yoki qo'shimcha amallar
-    await ctx.reply(`Yangi promokod yaratildi: ${promo}`);
-    return;
-  }
-  // Admin: foydalanuvchi izlash
-  if (ctx.session.awaitingFindUser && isAdmin(ctx)) {
-    const query = ctx.message.text.trim().toLowerCase();
-    ctx.session.awaitingFindUser = false;
-    
-    try {
-      // Try to find user by ID
-      let foundUser = null;
-      let foundBy = '';
-      
-      // Check if query is a user ID
-      if (/^\d+$/.test(query)) {
-        const userId = parseInt(query);
-        try {
-          const user = await ctx.telegram.getChat(userId);
-          foundUser = user;
-          foundBy = 'ID';
-        } catch (error) {
-          // User not found by ID, will search by name/username
-        }
-      }
-      
-      // Search for all matching users by username or name
-      const allUsers = Array.from(global.botUsers || []);
-      const matchingUsers = [];
-      
-      // If we found by ID, add it to results
-      if (foundUser) {
-        matchingUsers.push(foundUser);
-      }
-      
-      // Search through all users for matches
-      for (const userId of allUsers) {
-        try {
-          // Skip if this is the user we already found by ID
-          if (foundUser && foundUser.id === userId) continue;
-          
-          const user = await ctx.telegram.getChat(userId);
-          const usernameMatch = user.username && user.username.toLowerCase().includes(query);
-          const firstNameMatch = user.first_name && user.first_name.toLowerCase().includes(query);
-          const lastNameMatch = user.last_name && user.last_name.toLowerCase().includes(query);
-          
-          if (usernameMatch || firstNameMatch || lastNameMatch) {
-            matchingUsers.push(user);
-          }
-        } catch (error) {
-          console.error(`Foydalanuvchi ma'lumotlarini olishda xatolik (${userId}):`, error);
-        }
-        
-        // Small delay to avoid hitting rate limits
-        await new Promise(resolve => setTimeout(resolve, 30));
-      }
-      
-      if (matchingUsers.length > 0) {
-        if (matchingUsers.length === 1) {
-          // If only one user found, show detailed info
-          const user = matchingUsers[0];
-          const userId = user.id;
-          const userBalance = getUserBalance(userId) || 0;
-          
-          // Get user's orders count
-          const userOrders = global.orders ? 
-            Object.values(global.orders).filter(o => o.userId === userId) : [];
-          const completedOrders = userOrders.filter(o => o.status === 'completed');
-          
-          const userInfo = `👤 *Foydalanuvchi ma\'lumotlari*\n\n` +
-            `🆔 ID: \`${userId}\`\n` +
-            `👤 Ism: ${user.first_name || 'Mavjud emas'} ${user.last_name || ''}\n` +
-            `🔗 Username: @${user.username || 'mavjud emas'}\n` +
-            `💰 Balans: *${userBalance.toLocaleString()} so'm*\n` +
-            `📅 Buyurtmalar: ${completedOrders.length} ta (${userOrders.length} jami)\n` +
-            `📊 Umumiy xarajat: ${completedOrders.reduce((sum, o) => sum + (o.price || 0), 0).toLocaleString()} so'm\n\n` +
-            `🔍 _Ma\'lumotlar faqat ko'rish uchun_`;
-          
-          // No interactive buttons, just show the info
-          const keyboard = [
-            [Markup.button.callback('◀️ Orqaga', 'admin:findUser')]
-          ];
-          
-          // Send the message only to the admin who searched
-          if (ctx.chat && ctx.chat.id === ctx.from.id) {
-            await sendOrUpdateMenu(ctx, userInfo, keyboard, { 
-              parse_mode: 'Markdown',
-              disable_web_page_preview: true
-            });
-          }
-        } else {
-          // If multiple users found, show list
-          let userList = `🔍 *Topilgan foydalanuvchilar (${matchingUsers.length} ta)*\n\n`;
-          const userButtons = [];
-          
-          // Add up to 10 matching users
-          for (let i = 0; i < Math.min(matchingUsers.length, 10); i++) {
-            const user = matchingUsers[i];
-            const userBalance = getUserBalance(user.id) || 0;
-            const displayName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Noma\'lum';
-            const username = user.username ? `@${user.username}` : 'Noma\'lum';
-            
-            userList += `👤 *${i+1}.* ${displayName}\n` +
-                       `   🔹 ${username} | ${userBalance.toLocaleString()} so'm\n` +
-                       `   🔹 ID: \`${user.id}\`\n\n`;
-            
-            // Add a button for each user
-            userButtons.push([
-              Markup.button.callback(
-                `👤 ${displayName} (${userBalance.toLocaleString()} so'm)`, 
-                `admin:view_user:${user.id}`
-              )
-            ]);
-          }
-          
-          if (matchingUsers.length > 10) {
-            userList += `\n...va yana ${matchingUsers.length - 10} ta foydalanuvchi topildi.\n`;
-            userList += `Qidiruvni aniqroq qiling.`;
-          }
-          
-          // Add back button
-          keyboard.push([Markup.button.callback('◀️ Orqaga', 'admin:findUser')]);
-          
-          await sendOrUpdateMenu(ctx, userList, keyboard);
-        }
-      } else {
-        await sendOrUpdateMenu(
-          ctx,
-          `❌ Foydalanuvchi topilmadi\n\n"${query}" bo'yicha hech qanday foydalanuvchi topilmadi.`,
-          [
-            [Markup.button.callback('🔄 Qayta urinish', 'admin:findUser')],
-            [Markup.button.callback('◀️ Orqaga', 'back:admin')]
-          ]
-        );
-      }
-    } catch (error) {
-      console.error('Foydalanuvchi qidirishda xatolik:', error);
-      await ctx.reply('❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
-      await sendAdminPanel(ctx);
-    }
-    return;
-  }
-  // Handle promo code creation
-  if (ctx.session.creatingPromo) {
-    // Skip if it's a command
-    if (ctx.message.text.startsWith('/')) {
-      // Skip command handling as we're in promo creation mode
-      return;
-    }
-    
-    const { step, data } = ctx.session.creatingPromo;
-    const text = ctx.message.text.trim();
-    
-    if (step === 'amount') {
-      const amount = parseInt(text);
-      if (isNaN(amount) || amount <= 0) {
-        await ctx.reply('❌ Noto\'g\'ri summa kiritildi. Iltimos, musbat son kiriting:');
-        return;
-      }
-      
-      data.amount = amount;
-      ctx.session.creatingPromo.step = 'uses';
-      
-      await sendOrUpdateMenu(
-        ctx,
-        `💰 *Summa: ${amount.toLocaleString()} so'm*\n\n` +
-        `🔄 Promo kod nechi marta ishlatilishi mumkin?\n` +
-        `Iltimos, foydalanishlar sonini kiriting yoki tanlang:`, 
-        [
-          [Markup.button.callback('1 marta', 'setPromoUses:1')],
-          [Markup.button.callback('5 marta', 'setPromoUses:5')],
-          [Markup.button.callback('10 marta', 'setPromoUses:10')],
-          [Markup.button.callback('◀️ Orqaga', 'admin:promoMenu')]
-        ],
-        { parse_mode: 'Markdown' }
-      );
-      return;
-    } else if (step === 'uses') {
-      const uses = parseInt(text);
-      if (isNaN(uses) || uses <= 0) {
-        await ctx.reply('❌ Noto\'g\'ri son kiritildi. Iltimos, musbat son kiriting:');
-        return;
-      }
-      
-      data.uses = uses;
-      ctx.session.creatingPromo.step = 'expiry';
-      
-      await sendOrUpdateMenu(
-        ctx,
-        `🔄 *Foydalanishlar soni: ${uses} marta*\n\n` +
-        `📅 Promo kod qancha kunga amal qiladi?\n` +
-        `Iltimos, muddatni kiriting yoki tanlang:`, 
-        [
-          [Markup.button.callback('1 kun', 'setPromoExpiry:1')],
-          [Markup.button.callback('7 kun', 'setPromoExpiry:7')],
-          [Markup.button.callback('30 kun', 'setPromoExpiry:30')],
-          [Markup.button.callback('◀️ Orqaga', 'admin:promoMenu')]
-        ],
-        { parse_mode: 'Markdown' }
-      );
-      return;
-    } else if (step === 'expiry') {
-      const days = parseInt(text);
-      if (isNaN(days) || days <= 0) {
-        await ctx.reply('❌ Noto\'g\'ri kun soni kiritildi. Iltimos, musbat son kiriting:');
-        return;
-      }
-      
-      data.expiresInDays = days;
-      
-      const { amount, uses } = data;
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + days);
-      
-      await sendOrUpdateMenu(
-        ctx,
-        `✅ *Promo kod ma\'lumotlari*\n\n` +
-        `💰 Summa: *${amount.toLocaleString()} so'm*\n` +
-        `🔄 Foydalanish: *${uses} marta*\n` +
-        `📆 Amal qilish muddati: *${days} kun*\n` +
-        `📅 Tugash sanasi: *${expiresAt.toLocaleDateString()}*\n\n` +
-        `Promo kodni yaratishni tasdiqlaysizmi?`,
-        [
-          [Markup.button.callback('✅ Tasdiqlash', 'admin:confirmPromo')],
-          [Markup.button.callback('❌ Bekor qilish', 'admin:promoMenu')]
-        ],
-        { parse_mode: 'Markdown' }
-      );
-      return;
-    }
-    
-    await ctx.reply('❌ Noto\'g\'ri miqdor kiritildi. Iltimos, musbat son kiriting.');
-    return;
-  }
-  
-  // Admin: broadcast
-  if (ctx.session.awaitingBroadcast && ctx.session.broadcastState?.step === 'awaiting_message' && isAdmin(ctx)) {
-    const broadcastText = ctx.message.text;
-    
-    // Store the broadcast message in session
-    ctx.session.broadcastState = {
-      step: 'confirm_send',
-      message: broadcastText,
-      messageIds: {}
-    };
-    
-    // Show confirmation with cancel button
-    const keyboard = [
-      [
-        Markup.button.callback('✅ Xabarni yuborish', 'confirm_broadcast'),
-        Markup.button.callback('❌ Bekor qilish', 'cancel_broadcast')
-      ]
-    ];
-    
-    await sendOrUpdateMenu(
-      ctx,
-      `📝 *Xabar matni:*\n\n${broadcastText}\n\n` +
-      `Ushbu xabarni barcha foydalanuvchilarga yuborishni tasdiqlaysizmi?`,
-      keyboard
-    );
-    
-    return;
-  }
-  
-  return next();
-});
-
-// /start komandasi uchun handler
-bot.command('start', async (ctx) => {
-  try {
-    // Avval obunani tekshirish
-    const checkResult = await checkUserSubscription(ctx);
-    
-    // Agar obuna bo'lmagan bo'lsa, obuna bo'lish sahifasiga yo'naltirish
-    if (!checkResult.subscribed) {
-      return await sendSubscriptionMessage(ctx, checkResult);
-    }
-    
-    // Aks holda asosiy menyuni ko'rsatish
-    return await sendMainMenu(ctx);
-  } catch (error) {
-    console.error('Start command error:', error);
+    console.error('Game ID input error:', error);
     await ctx.reply('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
   }
 });
 
-// Obunani tekshirish
-bot.action('check_subscription', async (ctx) => {
+// Handle purchase confirmation
+bot.action('confirm_purchase', async (ctx) => {
   try {
-    const isSubscribed = await checkUserSubscription(ctx);
-    
-    if (isSubscribed) {
-      await ctx.answerCbQuery('✅ Siz barcha kanallarga obuna bo\'lgansiz!');
-      return await sendMainMenu(ctx);
-    } else {
-      await ctx.answerCbQuery('❌ Iltimos, barcha kanallarga obuna bo\'ling!');
-      return await sendSubscriptionMessage(ctx);
+    if (!ctx.session.purchase) {
+      await ctx.answerCbQuery('Xatolik: Buyurtma topilmadi');
+      return sendMainMenu(ctx);
     }
-  } catch (error) {
-    console.error('Obunani tekshirishda xatolik:', error);
-    await ctx.answerCbQuery('❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
-  }
-});
-
-// Har bir xabar uchun obunani tekshirish
-bot.use(async (ctx, next) => {
-  // Agar bu obunani tekshirish yoki kanalga o'tish bo'lsa, o'tkazib yuboramiz
-  if (ctx.callbackQuery?.data === 'check_subscription' || 
-      ctx.callbackQuery?.data?.startsWith('http')) {
-    return next();
-  }
-  
-  // Agar admin bo'lsa, tekshirmaymiz
-  if (isAdmin(ctx)) {
-    return next();
-  }
-  
-  // Obunani tekshirish
-  const isSubscribed = await checkUserSubscription(ctx);
-  
-  if (!isSubscribed) {
-    // Agar obuna bo'lmagan bo'lsa, obuna bo'lish sahifasiga yo'naltiramiz
-    return await sendSubscriptionMessage(ctx);
-  }
-  
-  // Aks holda keyingi middlewarega o'tamiz
-  return next();
-});
-
-// Kanal ma'lumotlarini o'qish
-function getChannels() {
-  const channels = [];
-  let i = 1;
-  
-  while (process.env[`CHANNEL_${i}_USERNAME`] && process.env[`CHANNEL_${i}_LINK`]) {
-    channels.push({
-      username: process.env[`CHANNEL_${i}_USERNAME`].replace('@', ''), // @ belgisini olib tashlaymiz
-      link: process.env[`CHANNEL_${i}_LINK`]
-    });
-    i++;
-  }
-  
-  return channels;
-}
-
-// Foydalanuvchi kanallarga obuna bo'lganligini tekshirish
-async function checkUserSubscription(ctx) {
-  try {
+    
+    const { type, amount, price, gameId } = ctx.session.purchase;
     const userId = ctx.from.id;
-    const channels = getChannels();
-    
-    // Agar kanallar mavjud bo'lmasa, obunani tekshirish shart emas
-    if (channels.length === 0) {
-      console.log('Obunani tekshirish o\'chirilgan - kanallar mavjud emas');
-      return { subscribed: true, channels: [] };
-    }
-    
-    const unsubscribedChannels = [];
-    let hasAccessError = false;
-    
-    for (const channel of channels) {
-      try {
-        // Kanal username orqali chat ma'lumotlarini olamiz
-        const chat = await ctx.telegram.getChat(`@${channel.username}`);
-        const member = await ctx.telegram.getChatMember(chat.id, userId);
-        
-        if (!['member', 'administrator', 'creator'].includes(member.status)) {
-          console.log(`Foydalanuvchi ${userId} @${channel.username} kanaliga obuna emas`);
-          unsubscribedChannels.push(channel);
-        }
-      } catch (error) {
-        console.error(`Kanalni tekshirishda xatolik (@${channel.username}):`, error);
-        
-        // If we can't access member list, we'll assume the user is not subscribed
-        if (error.code === 400 && error.description.includes('member list is inaccessible')) {
-          console.log(`Bot @${channel.username} kanalining a'zolar ro'yxatini ko'rolmadi. Iltimos, botni kanalga admin qiling.`);
-          unsubscribedChannels.push(channel);
-          hasAccessError = true;
-        }
-        continue;
-      }
-    }
-    
-    return { 
-      subscribed: unsubscribedChannels.length === 0,
-      channels: unsubscribedChannels,
-      hasAccessError
-    };
-  } catch (error) {
-    console.error('Obunani tekshirishda xatolik:', error);
-    return { 
-      subscribed: true, // Xatolik bo'lsa ham foydalanuvchiga ruxsat beramiz
-      channels: [],
-      hasAccessError: true
-    };
-  }
-};
-
-// Obuna bo'lish tugmasi bilan xabar yuborish
-const sendSubscriptionMessage = async (ctx, checkResult = null) => {
-  try {
-    const channels = checkResult?.channels?.length > 0 ? checkResult.channels : getChannels();
-    
-    // Agar kanallar mavjud bo'lmasa, asosiy menyuga qaytamiz
-    if (channels.length === 0) {
-      console.log('Obuna xabari yuborilmadi - kanallar mavjud emas');
-      return await sendMainMenu(ctx);
-    }
-    
-    let message = '⚠️ *Diqqat!*\n\n';
-    
-    // Add warning if there was an access error
-    if (checkResult?.hasAccessError) {
-      message += '❗ *Diqqat!* Bot ba\'zi kanallarga kirish huquqiga ega emas. ';
-      message += 'Iltimos, botni kanalga admin qiling yoki admin bilan bog\'laning.\n\n';
-    }
-    
-    message += 'Botdan to\'liq foydalanish uchun quyidagi kanallarga a\'zo bo\'ling:\n\n';
-    
-    // Create inline keyboard with channel buttons
-    const inlineKeyboard = [];
-    
-    // Add each channel as an inline URL button
-    channels.forEach(channel => {
-      inlineKeyboard.push([
-        { text: `📢 ${channel.username} kanali`, url: channel.link }
-      ]);
-    });
-    
-    // Add check subscription button
-    inlineKeyboard.push([
-      { text: '✅ Obunani tekshirish', callback_data: 'check_subscription' }
-    ]);
-    
-    // Send the message with inline keyboard
-    try {
-      await ctx.telegram.sendMessage(
-        ctx.chat.id,
-        message + 'Quyidagi tugmalar orqali kanallarga obuna bo\'ling:',
-        {
-          parse_mode: 'Markdown',
-          reply_markup: {
-            inline_keyboard: inlineKeyboard
-          }
-        }
-      );
-    } catch (error) {
-      console.error('Xabar yuborishda xatolik:', error);
-      // Fallback to old method if inline keyboard fails
-      const buttons = channels.map(channel => [
-        Markup.button.url(`📢 ${channel.username} kanaliga obuna bo'lish`, channel.link)
-      ]);
-      buttons.push([Markup.button.callback('✅ Obunani tekshirish', 'check_subscription')]);
-      
-      await sendOrUpdateMenu(
-        ctx,
-        message + 'Quyidagi kanallarga obuna bo\'ling:',
-        buttons
-      );
-    }
-  } catch (error) {
-    console.error('Obuna xabarini yuborishda xatolik:', error);
-    // Xatolik yuz berganda ham foydalanuvchiga tushunarli xabar qaytaramiz
-    await ctx.reply('Kechirasiz, xatolik yuz berdi. Iltimos, keyinroq qayta urinib ko\'ring.');
-    
-    // Agar xatolik yuz bersa ham asosiy menyuni ko'rsatamiz
-    try {
-      await sendMainMenu(ctx);
-    } catch (e) {
-      console.error('Asosiy menyuni yuborishda xatolik:', e);
-    }
-  }
-};
-
-// Admin Free Fire buyurtmasini tasdiqlash
-bot.action(/confirm_freefire:(\w+):(\d+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-  
-  const orderId = ctx.match[1];
-  const userId = parseInt(ctx.match[2]);
-  
-  try {
-    // Update order status in database (you'll need to implement this)
-    // await updateOrderStatus(orderId, 'completed');
-    
-    // Notify user
-    await ctx.telegram.sendMessage(
-      userId,
-      `✅ *Buyurtmangiz tasdiqlandi!*\n\n` +
-      `🆔 Buyurtma raqami: *${orderId}*\n` +
-      `🔹 Xizmat: *Free Fire Diamond*\n\n` +
-      `💎 Diamondlar tez orada hisobingizga tushiriladi.\n` +
-      `Agar 24 soat ichida Diamondlar hisobingizga tushmasa, @KAROL_FF_00 ga murojaat qiling.`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    // Update admin message
-    await ctx.editMessageText(
-      ctx.callbackQuery.message.text + '\n\n✅ *Tasdiqlandi* ' +
-      `\n👤 Admin: ${ctx.from.first_name} (${ctx.from.id})`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    await ctx.answerCbQuery('Buyurtma tasdiqlandi!');
-  } catch (error) {
-    console.error('Free Fire buyurtmasini tasdiqlashda xatolik:', error);
-    await ctx.answerCbQuery('Xatolik yuz berdi!');
-  }
-});
-
-// Admin Free Fire buyurtmasini rad etish
-bot.action(/reject_freefire:(\w+):(\d+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-  
-  const orderId = ctx.match[1];
-  const userId = parseInt(ctx.match[2]);
-  
-  try {
-    // Return user's money (you'll need to implement this)
-    // const order = await getOrder(orderId);
-    // await updateUserBalance(userId, order.price);
-    // await updateOrderStatus(orderId, 'rejected');
-    
-    // Notify user
-    await ctx.telegram.sendMessage(
-      userId,
-      `❌ *Buyurtmangiz bekor qilindi!*\n\n` +
-      `🆔 Buyurtma raqami: *${orderId}*\n` +
-      `🔹 Xizmat: *Free Fire Diamond*\n\n` +
-      `ℹ Iltimos, qaytadan urinib ko'ring yoki @KAROL_FF_00 ga murojaat qiling.`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    // Update admin message
-    await ctx.editMessageText(
-      ctx.callbackQuery.message.text + '\n\n❌ *Rad etildi* ' +
-      `\n👤 Admin: ${ctx.from.first_name} (${ctx.from.id})`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    await ctx.answerCbQuery('Buyurtma rad etildi!');
-  } catch (error) {
-    console.error('Free Fire buyurtmasini rad etishda xatolik:', error);
-    await ctx.answerCbQuery('Xatolik yuz berdi!');
-  }
-});
-
-// Admin Free Fire buyurtmasini tasdiqlash
-bot.action(/confirm_freefire:(\w+):(\d+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-  
-  const orderId = ctx.match[1];
-  const userId = parseInt(ctx.match[2]);
-  
-  try {
-    // Update order status in database (you'll need to implement this)
-    // await updateOrderStatus(orderId, 'completed');
-    
-    // Notify user
-    await ctx.telegram.sendMessage(
-      userId,
-      `✅ *Buyurtmangiz tasdiqlandi!*\n\n` +
-      `🆔 Buyurtma raqami: *${orderId}*\n` +
-      `🔹 Xizmat: *Free Fire Diamond*\n\n` +
-      `💎 Diamondlar tez orada hisobingizga tushiriladi.\n` +
-      `Agar 24 soat ichida Diamondlar hisobingizga tushmasa, @KAROL_FF_00 ga murojaat qiling.`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    // Update admin message
-    await ctx.editMessageText(
-      ctx.callbackQuery.message.text + '\n\n✅ *Tasdiqlandi* ' +
-      `\n👤 Admin: ${ctx.from.first_name} (${ctx.from.id})`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    await ctx.answerCbQuery('Buyurtma tasdiqlandi!');
-  } catch (error) {
-    console.error('Free Fire buyurtmasini tasdiqlashda xatolik:', error);
-    await ctx.answerCbQuery('Xatolik yuz berdi!');
-  }
-});
-
-// Admin Free Fire buyurtmasini rad etish
-bot.action(/reject_freefire:(\w+):(\d+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-  
-  const orderId = ctx.match[1];
-  const userId = parseInt(ctx.match[2]);
-  
-  try {
-    // Return user's money (you'll need to implement this)
-    // const order = await getOrder(orderId);
-    // await updateUserBalance(userId, order.price);
-    // await updateOrderStatus(orderId, 'rejected');
-    
-    // Notify user
-    await ctx.telegram.sendMessage(
-      userId,
-      `❌ *Buyurtmangiz bekor qilindi!*\n\n` +
-      `🆔 Buyurtma raqami: *${orderId}*\n` +
-      `🔹 Xizmat: *Free Fire Diamond*\n\n` +
-      `ℹ Iltimos, qaytadan urinib ko'ring yoki @KAROL_FF_00 ga murojaat qiling.`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    // Update admin message
-    await ctx.editMessageText(
-      ctx.callbackQuery.message.text + '\n\n❌ *Rad etildi* ' +
-      `\n👤 Admin: ${ctx.from.first_name} (${ctx.from.id})`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    await ctx.answerCbQuery('Buyurtma rad etildi!');
-  } catch (error) {
-    console.error('Free Fire buyurtmasini rad etishda xatolik:', error);
-    await ctx.answerCbQuery('Xatolik yuz berdi!');
-  }
-});
-
-// Admin PUBG buyurtmasini tasdiqlash
-bot.action(/confirm_pubg:(\w+):(\d+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-
-  const orderId = ctx.match[1];
-  const userId = parseInt(ctx.match[2]);
-  
-  try {
-    // Get order details from database
-    // const order = await getOrder(orderId);
-    // if (!order) {
-    //   return await ctx.answerCbQuery('Buyurtma topilmadi!');
-    // }
-    
-    // Get order from global storage
-    if (!global.orders || !global.orders[orderId]) {
-      return await ctx.answerCbQuery('Buyurtma ma\'lumotlari topilmadi! Iltimos, foydalanuvchi qaytadan buyurtma bersin.');
-    }
-    
-    const order = global.orders[orderId];
-    
-    // Check if order is already processed
-    if (order.status === 'completed') {
-      return await ctx.answerCbQuery('Bu buyurtma allaqachon bajarilgan!');
-    }
-    
-    const { type, amount, price, username } = order;
-    const productType = type === 'pubg_uc' ? 'UC' : 'PP';
-    
-    // Get current user balance
     const userBalance = getUserBalance(userId);
+    const isFreeFire = type === 'freefire_uc';
     
-    // Check if user still has enough balance
+    // Double check balance
     if (userBalance < price) {
-      await ctx.answerCbQuery('Foydalanuvchida yetarli mablag\' mavjud emas!');
-      return await ctx.editMessageText(
-        `❌ *Balans yetarli emas!*\n` +
-        `👤 Foydalanuvchi: [${order.userName || 'Noma\'lum'}](tg://user?id=${userId})\n` +
-        `💰 Kerak: ${price.toLocaleString()} so'm\n` +
-        `💳 Mavjud: ${userBalance.toLocaleString()} so'm\n` +
-        `📦 Buyurtma: ${amount} ${productType}\n` +
-        `🆔 Buyurtma: #${orderId}\n\n` +
-        `❌ Iltimos, foydalanuvchiga xabar bering!`,
-        { parse_mode: 'Markdown' }
-      );
+      await ctx.answerCbQuery('❌ Balans yetarli emas');
+      return sendMainMenu(ctx);
     }
     
     // Deduct balance
     updateUserBalance(userId, -price);
     
-    // Update order status in global storage
-    if (global.orders && global.orders[orderId]) {
-      global.orders[orderId].status = 'completed';
-      global.orders[orderId].completedAt = new Date().toISOString();
-      global.orders[orderId].completedBy = ctx.from.id;
+    // Generate order ID with prefix based on game type
+    const orderPrefix = isFreeFire ? 'FF' : 'PUBG';
+    const orderId = `${orderPrefix}-${Date.now()}`;
+    
+    // Game name for display
+    const gameName = isFreeFire ? 'Free Fire' : 'PUBG';
+    
+    // Notify admin
+    const adminMessage = `🆕 *Yangi ${gameName} UC buyurtmasi*\n` +
+      `🆔 Buyurtma: ${orderId}\n` +
+      `👤 Foydalanuvchi: @${ctx.from.username || 'noma\'lum'} (${userId})\n` +
+      `💎 Miqdor: ${amount} UC\n` +
+      `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+      `🎮 O'yin ID: ${gameId}\n` +
+      `⏰ Vaqt: ${new Date().toLocaleString()}`;
+    
+    // Send notification to all admins
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await ctx.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' });
+      } catch (error) {
+        console.error(`Failed to send notification to admin ${adminId}:`, error);
+      }
     }
     
-    // Notify user
-    await bot.telegram.sendMessage(
-      userId,
-      `✅ Sizning #${orderId} raqamli buyurtmangiz tasdiqlandi!\n\n` +
-      `📦 Mahsulot: *${amount} ${productType}*\n` +
-      `👤 O'yinchi: *${username}*\n` +
-      `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
-      `💰 Qolgan balans: *${(userBalance - price).toLocaleString()} so'm*\n\n` +
-      `📦 Buyurtmangiz tez orada yetkazib beriladi.\n` +
-      `📞 Savollar bo'lsa: @d1yor_salee`,
+    // Send confirmation to user
+    await ctx.editMessageText(
+      `✅ Buyurtmangiz qabul qilindi!\n\n` +
+      `🎮 O'yin: ${gameName}\n` +
+      `🆔 Buyurtma raqami: ${orderId}\n` +
+      `💎 Miqdor: ${amount} UC\n` +
+      `💰 Narxi: ${price.toLocaleString()} so'm\n\n` +
+      `🔄 Buyurtmangiz tekshirilmoqda. Tez orada siz bilan bog'lanamiz.`,
       { parse_mode: 'Markdown' }
     );
     
-    // Update admin message
-    await ctx.answerCbQuery('✅ Buyurtma tasdiqlandi!');
-    await ctx.editMessageText(
-      `✅ *Buyurtma tasdiqlandi*\n` +
-      `🆔 Buyurtma: #${orderId}\n` +
-      `👤 Foydalanuvchi: [${order.userName || 'Noma\'lum'}](tg://user?id=${userId})\n` +
-      `💰 Summa: ${price.toLocaleString()} so'm\n` +
-      `📦 Miqdor: ${amount} ${productType}\n` +
-      `👤 Admin: ${ctx.from.first_name}\n` +
-      `⏰ Vaqt: ${new Date().toLocaleString()}`,
-      { 
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: [] } // Remove buttons after confirmation
-      }
-    );
-    
-    // Remove order from session
-    if (ctx.session.orders && ctx.session.orders[orderId]) {
-      delete ctx.session.orders[orderId];
-    }
+    // Clear session
+    delete ctx.session.purchase;
     
   } catch (error) {
-    console.error('Tasdiqlashda xatolik:', error);
-    await ctx.answerCbQuery('Xatolik yuz berdi!');
+    console.error('Purchase confirmation error:', error);
+    await ctx.answerCbQuery('Xatolik yuz berdi');
+    await sendMainMenu(ctx, '❌ Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
   }
 });
 
-// Admin PUBG buyurtmasini bekor qilish
-bot.action(/reject_pubg:(\w+):(\d+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-
-  const orderId = ctx.match[1];
-  const userId = ctx.match[2];
-  
-  try {
-    // Get order from global storage
-    if (!global.orders || !global.orders[orderId]) {
-      return await ctx.answerCbQuery('Buyurtma topilmadi!');
-    }
-    
-    const order = global.orders[orderId];
-    
-    // Update order status in global storage
-    if (global.orders[orderId]) {
-      global.orders[orderId].status = 'rejected';
-      global.orders[orderId].rejectedAt = new Date().toISOString();
-      global.orders[orderId].rejectedBy = ctx.from.id;
-    }
-    
-    // Notify user
-    try {
-      await bot.telegram.sendMessage(
-        userId,
-        `❌ Sizning #${orderId} raqamli buyurtmangiz bekor qilindi!\n` +
-        `📦 Mahsulot: *${order.amount} ${order.type === 'pubg_uc' ? 'UC' : 'PP'}*\n` +
-        `💰 Summa: *${order.price.toLocaleString()} so'm*\n` +
-        `⏰ Sana: ${new Date().toLocaleString()}\n\n` +
-        `ℹ Sabab: Admin tomonidan bekor qilindi\n` +
-        `📞 Savollar bo'lsa: @d1yor_salee`,
-        { parse_mode: 'Markdown' }
-      );
-    } catch (error) {
-      console.error('Foydalanuvchiga xabar yuborishda xatolik:', error);
-    }
-    
-    // Update admin message
-    await ctx.answerCbQuery('✅ Buyurtma bekor qilindi!');
-    await ctx.editMessageText(
-      `❌ *Buyurtma bekor qilindi*\n` +
-      `🆔 Buyurtma: #${orderId}\n` +
-      `👤 Foydalanuvchi: [${order.userName || 'Noma\'lum'}](tg://user?id=${userId})\n` +
-      `📦 Mahsulot: ${order.amount} ${order.type === 'pubg_uc' ? 'UC' : 'PP'}\n` +
-      `💰 Summa: ${order.price.toLocaleString()} so'm\n` +
-      `👤 Admin: ${ctx.from.first_name}\n` +
-      `⏰ Vaqt: ${new Date().toLocaleString()}`,
-      { 
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: [] } // Remove buttons after rejection
-      }
-    );
-  } catch (error) {
-    console.error('Bekor qilishda xatolik:', error);
-    await ctx.answerCbQuery('Xatolik yuz berdi!');
-  }
+// Handle purchase cancellation
+bot.action('cancel_purchase', async (ctx) => {
+  delete ctx.session.purchase;
+  await ctx.editMessageText('❌ Buyurtma bekor qilindi.');
+  await sendMainMenu(ctx);
 });
 
-// Admin buyurtmani tasdiqlash (inline button orqali)
-bot.action(/confirm_order:(\w+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
+// Handle game ID input for UC purchase
+bot.on('text', async (ctx, next) => {
+  // Skip if not from admin or not awaiting broadcast
+  if (isAdmin(ctx) && ctx.session.awaitingBroadcast) {
+    return next();
   }
   
-  const orderId = ctx.match[1];
-  const order = pendingOrders[orderId];
-  
-  if (!order) {
-    await ctx.answerCbQuery('Buyurtma topilmadi yoki allaqachon bajarilgan!');
-    return;
+  // Handle purchase flow
+  if (ctx.session?.purchase?.step === 'game_id') {
+    const gameId = ctx.message.text.trim();
+    
+    // Basic validation for game ID (numbers only)
+    if (!/^\d+$/.test(gameId)) {
+      return ctx.reply('❌ Noto\'g\'ri ID formati. Iltimos, faqat raqamlardan foydalaning.');
+    }
+    
+    // Store game ID and move to next step
+    ctx.session.purchase.gameId = gameId;
+    ctx.session.purchase.step = 'confirm';
+    
+    // Show confirmation message
+    const { type, amount, price } = ctx.session.purchase;
+    const gameName = type === 'freefire_uc' ? 'Free Fire' : 'PUBG';
+    
+    const message = `🛒 Buyurtma tafsilotlari:\n` +
+      `🎮 O'yin: ${gameName}\n` +
+      `💎 Miqdor: ${amount} UC\n` +
+      `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+      `🆔 O'yin ID: ${gameId}\n\n` +
+      `✅ Buyurtmani tasdiqlaysizmi?`;
+    
+    const keyboard = [
+      [
+        Markup.button.callback('✅ Tasdiqlash', 'confirm_purchase'),
+        Markup.button.callback('❌ Bekor qilish', 'cancel_purchase')
+      ]
+    ];
+    
+    return ctx.reply(message, Markup.inlineKeyboard(keyboard));
   }
   
-  const { userId, type, amount, username, price } = order;
-  
+  return next();
+});
+
+// Handle Free Fire UC purchase
+bot.action(/^freefire:uc:(\d+):(\d+)$/, async (ctx) => {
   try {
-    // Foydalanuvchi balansini tekshirish
+    const ucAmount = parseInt(ctx.match[1]);
+    const price = parseInt(ctx.match[2]);
+    const userId = ctx.from.id;
     const userBalance = getUserBalance(userId);
-    
+
+    // Check if user has enough balance
     if (userBalance < price) {
-      await ctx.reply(`❌ Xatolik! Foydalanuvchida yetarli mablag' yo'q.\n` +
-        `Balans: ${userBalance.toLocaleString()} so'm\n` +
-        `Kerak: ${price.toLocaleString()} so'm`);
-      return;
+      return ctx.reply(`❌ Sizning balansingiz yetarli emas. Sizda ${userBalance.toLocaleString()} so'm mavjud, kerak: ${price.toLocaleString()} so'm`);
     }
-    
-    // Balansdan pul yechish
-    updateUserBalance(userId, -price);
-    
-    // Foydalanuvchiga xabar
-    const userMessage = `✅ Sizning buyurtmangiz tasdiqlandi!\n\n` +
-      `📦 Turi: ${type === 'premium' ? 'Telegram Premium' : 'Telegram Stars'}\n` +
-      `🔢 Miqdor: ${amount} ${type === 'premium' ? 'oy' : 'stars'}\n` +
-      `💰 Hisobingizdan yechildi: ${price.toLocaleString()} so'm\n\n` +
-      `📝 Iltimos, kuting. Tez orada sizga yuboriladi.`;
-    
-    await ctx.telegram.sendMessage(userId, userMessage);
-    
-    // Buyurtmani o'chirish
-    delete pendingOrders[orderId];
-    
-    await ctx.reply(`✅ Buyurtma tasdiqlandi va foydalanuvchi hisobidan ${price.toLocaleString()} so'm yechib olindi.`);
+
+    // Store purchase in session
+    ctx.session.purchase = {
+      type: 'freefire_uc',
+      amount: ucAmount,
+      price: price,
+      step: 'game_id'
+    };
+
+    // Ask for Free Fire ID
+    await ctx.reply(`🎮 Free Fire ID raqamingizni yuboring (raqamlar bilan):`);
     
   } catch (error) {
-    console.error('Buyurtmani tasdiqlashda xatolik:', error);
-    await ctx.answerCbQuery('Xatolik yuz berdi: ' + error.message);
+    console.error('Free Fire UC purchase error:', error);
+    await ctx.reply('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
   }
 });
 
-// Admin buyurtmani bekor qilish (inline button orqali)
-bot.action(/cancel_order:(\w+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.answerCbQuery('Ruxsat yo\'q!');
-    return;
-  }
-  
-  const orderId = ctx.match[1];
-  const order = pendingOrders[orderId];
-  
-  if (!order) {
-    await ctx.answerCbQuery('Buyurtma topilmadi!');
-    return;
-  }
-  
-  const { userId, type, amount, username, price } = order;
-  
-  try {
-    // Foydalanuvchiga xabar
-    await ctx.telegram.sendMessage(
-      userId,
-      `❌ Sizning buyurtmangiz bekor qilindi!\n\n` +
-      `📦 Turi: ${type === 'premium' ? 'Telegram Premium' : 'Telegram Stars'}\n` +
-      `🔢 Miqdor: ${amount} ${type === 'premium' ? 'oy' : 'stars'}\n` +
-      `💰 Summa: ${price.toLocaleString()} so'm\n\n` +
-      `ℹ️ Iltimos, qaytadan urinib ko'ring yoki admin bilan bog'laning.`
-    );
-    
-    // Buyurtmani o'chirish
-    delete pendingOrders[orderId];
-    
-    // Xabarni yangilash
-    await ctx.editMessageText(
-      `${ctx.update.callback_query.message.text}\n\n` +
-      `❌ *Bekor qilindi*\n` +
-      `👤 Admin: @${ctx.from.username || 'noma\'lum'}\n` +
-      `🕒 Sana: ${new Date().toLocaleString()}`,
-      { parse_mode: 'Markdown' }
-    );
-    
-    await ctx.answerCbQuery('✅ Buyurtma bekor qilindi!');
-  } catch (error) {
-    console.error('Buyurtmani bekor qilishda xatolik:', error);
-    await ctx.answerCbQuery('Xatolik yuz berdi!');
-  }
+// Handle Free Fire menu button
+bot.action('freefire:buy_uc', async (ctx) => {
+  await sendFreeFireUcMenu(ctx);
 });
 
-// Admin buyurtmani bekor qilish (eski usul - command orqali)
-bot.command(/cancel_(\w+)/, async (ctx) => {
-  if (!isAdmin(ctx)) {
-    await ctx.reply('Sizda ruxsat yo\'q!');
-    return;
-  }
-  
-  const orderId = ctx.match[1];
-  const order = pendingOrders[orderId];
-  
-  if (!order) {
-    await ctx.reply('Buyurtma topilmadi!');
-    return;
-  }
-  
-  const { userId, type, amount, price } = order;
-  
-  try {
-    // Foydalanuvchiga xabar
-    await ctx.telegram.sendMessage(
-      userId,
-      `❌ Sizning buyurtmangiz bekor qilindi!\n\n` +
-      `📦 Turi: ${type === 'premium' ? 'Telegram Premium' : 'Telegram Stars'}\n` +
-      `🔢 Miqdor: ${amount} ${type === 'premium' ? 'oy' : 'stars'}\n` +
-      `💰 Summa: ${price.toLocaleString()} so'm\n\n` +
-      `ℹ️ Iltimos, qaytadan urinib ko'ring yoki admin bilan bog'laning.`
-    );
-    
-    // Buyurtmani o'chirish
-    delete pendingOrders[orderId];
-    
-    await ctx.reply('✅ Buyurtma bekor qilindi!');
-  } catch (error) {
-    console.error('Buyurtmani bekor qilishda xatolik:', error);
-    await ctx.reply('Xatolik yuz berdi: ' + error.message);
-  }
+// Handle back button for Free Fire menu
+bot.action('back:freefire', async (ctx) => {
+  await sendFreeFireMenu(ctx);
 });
 
-// Orqaga tugmasi bosilganda (asosiy menyuga qaytish)
-bot.action('back:main', async (ctx) => {
+// Handle PUBG UC purchase
+bot.action(/^pubg:uc:(\d+):(\d+)$/, async (ctx) => {
   try {
-    // Avvalgi xabarni o'chirishga harakat qilamiz
-    try {
-      await ctx.deleteMessage();
-    } catch (e) {
-      // Xatoni e'tiborsiz qoldiramiz
-    }
-    // Asosiy menyuni yuboramiz
-    await sendMainMenu(ctx);
-  } catch (error) {
-    console.error('Orqaga qaytishda xatolik:', error);
-  }
-});
-
-// Handle premium purchase
-bot.action(/^buy:premium:(\d+):(\d+)$/, async (ctx) => {
-  try {
-    const months = parseInt(ctx.match[1]);
+    const ucAmount = parseInt(ctx.match[1]);
     const price = parseInt(ctx.match[2]);
     const userId = ctx.from.id;
-    const username = ctx.from.username || 'Noma\'lum';
-    
-    // Check user balance
-    const userBalance = await getUserBalance(userId);
-    if (userBalance < price) {
-      const needed = price - userBalance;
-      await ctx.answerCbQuery(`❌ Yetarli mablag' mavjud emas. Sizga yana ${needed.toLocaleString()} so'm kerak.`);
-      return;
-    }
-    
-    // Ask for username
-    ctx.session.purchase = {
-      type: 'premium',
-      amount: months,
-      price: price,
-      step: 'username'
-    };
-    
-    await ctx.answerCbQuery();
-    await ctx.reply(`📱 Telegram Premium ${months} oy uchun ${price.toLocaleString()} so'm\n\nIltimos, Premium qo'shiladigan Telegram foydalanuvchi nomini (@username yoki telefon raqam) yuboring:`);
-  } catch (error) {
-    console.error('Premium purchase error:', error);
-    await ctx.answerCbQuery('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
-  }
-});
+    const userBalance = getUserBalance(userId);
 
-// Handle stars purchase
-bot.action(/^buy:stars:(\d+):(\d+)$/, async (ctx) => {
-  try {
-    const stars = parseInt(ctx.match[1]);
-    const price = parseInt(ctx.match[2]);
-    const userId = ctx.from.id;
-    const username = ctx.from.username || 'Noma\'lum';
-    
-    // Check user balance
-    const userBalance = await getUserBalance(userId);
+    // Check if user has enough balance
     if (userBalance < price) {
-      const needed = price - userBalance;
-      await ctx.answerCbQuery(`❌ Yetarli mablag' mavjud emas. Sizga yana ${needed.toLocaleString()} so'm kerak.`);
-      return;
+      return ctx.reply(`❌ Sizning balansingiz yetarli emas. Sizda ${userBalance.toLocaleString()} so'm mavjud, kerak: ${price.toLocaleString()} so'm`);
     }
-    
-    // Ask for username
+
+    // Store purchase in session
     ctx.session.purchase = {
-      type: 'stars',
-      amount: stars,
+      type: 'pubg_uc',
+      amount: ucAmount,
       price: price,
-      step: 'username'
+      step: 'game_id'
     };
+
+    // Ask for PUBG ID
+    await ctx.reply(`🎮 PUBG ID raqamingizni yuboring (raqamlar bilan):`);
     
-    await ctx.answerCbQuery();
-    await ctx.reply(`⭐ ${stars} Stars uchun ${price.toLocaleString()} so'm\n\nIltimos, Stars qo'shiladigan Telegram foydalanuvchi nomini (@username) yuboring:`);
   } catch (error) {
-    console.error('Stars purchase error:', error);
+    console.error('PUBG UC purchase error:', error);
     await ctx.answerCbQuery('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
   }
+
 });
 
 // Premium/Stars orqaga tugmasi (asosiy Premium/Stars menyusiga qaytish)
