@@ -344,19 +344,26 @@ bot.action(/^almaz:amount:(.+)$/, async (ctx) => {
     ctx.session.almaz = {
       step: 'uid',
       package: packageName,
-      price: price
+      price: price,
+      amount: packageName.includes('105') ? '105' : '180' // Set amount based on package
     };
     
     const keyboard = [
       [Markup.button.callback('❌ Bekor qilish', 'back:freefire')]
     ];
+    await ctx.reply(
+      `🆔 Iltimos, Free Fire ID raqamingizni yuboring.\n\n` +
+      `💎 Paket: ${packageName} Almaz\n` +
+      `💰 Narxi: ${price ? price.toLocaleString() + ' so\'m' : '1,000 so\'m'}\n\n` +
+      `ID raqamingizni shu ko'rinishda yuboring:\n` +
+      `<code>123456789</code>`,
+      {
+        ...Markup.inlineKeyboard(keyboard),
+        parse_mode: 'Markdown'
+      }
+    );
     
-    const message = `🆔 Iltimos, Free Fire ID raqamingizni yuboring.\n\n` +
-      `💎 Paket: *${packageName}*\n` +
-      `💰 Narxi: *${price.toLocaleString()} so'm*\n\n` +
-      `ID raqamingizni shu ko'rinishda yuboring:\n\`123456789\``;
-    
-    return await sendOrUpdateMenu(ctx, message, keyboard);
+    return;
   } catch (error) {
     console.error('Free Fire purchase error:', error);
     await ctx.answerCbQuery('Xatolik yuz berdi! Iltimos qaytadan urinib ko\'ring.');
