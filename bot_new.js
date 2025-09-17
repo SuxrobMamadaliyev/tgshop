@@ -218,6 +218,11 @@ const REFERRAL_BONUS = 100; // 100 so'm for each successful referral
 
 // --- Free Fire Almaz narxlari ---
 const ALMAZ_PRICES = {
+  '105 yoki 180': 1000,
+  '210 yoki 360': 2000,
+  '530 yoki 720': 5000,
+  '1060 yoki 1900': 10000,
+  '2180 yoki 4000': 20000,
   '105 yoki 180': 15000,
   '210 yoki 285': 30000,
   '326 yoki 559': 45000,
@@ -297,30 +302,50 @@ bot.use(session({
 // --- Almaz sotib olish bosqichlari ---
 bot.action('buy:almaz', async (ctx) => {
   await sendOrUpdateMenu(ctx, 'Qancha Almaz sotib olmoqchisiz?', [
-    [Markup.button.callback('105 yoki 180', 'almaz:amount:105 yoki 180')],
-    [Markup.button.callback('210 yoki 360', 'almaz:amount:210 yoki 360')],
-    [Markup.button.callback('530 yoki 720', 'almaz:amount:530 yoki 720')],
-    [Markup.button.callback('1060 yoki 1900', 'almaz:amount:1060 yoki 1900')],
-    [Markup.button.callback('2180 yoki 4000', 'almaz:amount:2180 yoki 4000')],
+    [Markup.button.callback('105 yoki 180 - 1,000 so\'m', 'almaz:amount:105 yoki 180')],
+    [Markup.button.callback('210 yoki 360 - 2,000 so\'m', 'almaz:amount:210 yoki 360')],
+    [Markup.button.callback('530 yoki 720 - 5,000 so\'m', 'almaz:amount:530 yoki 720')],
+    [Markup.button.callback('1,060 yoki 1,900 - 10,000 so\'m', 'almaz:amount:1060 yoki 1900')],
+    [Markup.button.callback('2,180 yoki 4,000 - 20,000 so\'m', 'almaz:amount:2180 yoki 4000')],
+    [Markup.button.callback('105 yoki 180 - 15,000 so\'m', 'almaz:amount:105 yoki 180:15000')],
+    [Markup.button.callback('210 yoki 285 - 30,000 so\'m', 'almaz:amount:210 yoki 285:30000')],
+    [Markup.button.callback('326 yoki 559 - 45,000 so\'m', 'almaz:amount:326 yoki 559:45000')],
+    [Markup.button.callback('431 yoki 664 - 60,000 so\'m', 'almaz:amount:431 yoki 664:60000')],
+    [Markup.button.callback('546 yoki 936 - 75,000 so\'m', 'almaz:amount:546 yoki 936:75000')],
+    [Markup.button.callback('651 yoki 1,041 - 90,000 so\'m', 'almaz:amount:651 yoki 1041:90000')],
+    [Markup.button.callback('756 yoki 1,262 - 105,000 so\'m', 'almaz:amount:756 yoki 1262:105000')],
+    [Markup.button.callback('872 yoki 1,262 - 120,000 so\'m', 'almaz:amount:872 yoki 1262:120000')],
+    [Markup.button.callback('1,113 yoki 1,980 - 150,000 so\'m', 'almaz:amount:1113 yoki 1980:150000')],
+    [Markup.button.callback('1,439 yoki 2,306 - 195,000 so\'m', 'almaz:amount:1439 yoki 2306:195000')],
+    [Markup.button.callback('1,659 yoki 2,528 - 230,000 so\'m', 'almaz:amount:1659 yoki 2528:230000')],
+    [Markup.button.callback('1,985 yoki 4,033 - 275,000 so\'m', 'almaz:amount:1985 yoki 4033:275000')],
+    [Markup.button.callback('2,398 yoki 4,033 - 315,000 so\'m', 'almaz:amount:2398 yoki 4033:315000')],
+    [Markup.button.callback('2,944 yoki 4,033 - 395,000 so\'m', 'almaz:amount:2944 yoki 4033:395000')],
+    [Markup.button.callback('3,511 yoki 5,146 - 470,000 so\'m', 'almaz:amount:3511 yoki 5146:470000')],
+    [Markup.button.callback('4,074 yoki 6,431 - 550,000 so\'m', 'almaz:amount:4074 yoki 6431:550000')],
+    [Markup.button.callback('4,796 yoki 6,431 - 645,000 so\'m', 'almaz:amount:4796 yoki 6431:645000')],
+    [Markup.button.callback('6,160 yoki 10,360 - 700,000 so\'m', 'almaz:amount:6160 yoki 10360:700000')],
+    [Markup.button.callback('12,320 yoki 16,520 - 1,400,000 so\'m', 'almaz:amount:12320 yoki 16520:1400000')],
+    [Markup.button.callback('24,640 yoki 28,840 - 2,700,000 so\'m', 'almaz:amount:24640 yoki 28840:2700000')],
     [Markup.button.callback('⬅️ Orqaga', 'back:main')]
   ]);
 });
 
 // Handle Free Fire diamond amount selection
-bot.action(/^almaz:amount:(.+)$/, async (ctx) => {
+bot.action(/^almaz:amount:(.+?)(?::(\d+))?$/, async (ctx) => {
   try {
     const packageName = ctx.match[1].trim();
+    const customPrice = ctx.match[2] ? parseInt(ctx.match[2]) : null;
     
-    // Define package prices
-    const prices = {
-      '105 yoki 180': 1000,
-      '210 yoki 360': 2000,
-      '530 yoki 720': 5000,
-      '1060 yoki 1900': 10000,
-      '2180 yoki 4000': 20000
-    };
+    // Use custom price if provided, otherwise get from ALMAZ_PRICES
+    const price = customPrice || ALMAZ_PRICES[packageName];
     
-    const price = prices[packageName] || 0;
+    if (!price) {
+      console.error('Price not found for package:', packageName);
+      await ctx.answerCbQuery('Xatolik yuz berdi! Iltimos qaytadan urinib ko\'ring.');
+      return await sendFreeFireMenu(ctx);
+    }
+    
     const userId = ctx.from.id;
     const userBalance = getUserBalance(userId);
     
@@ -340,12 +365,16 @@ bot.action(/^almaz:amount:(.+)$/, async (ctx) => {
       return await sendOrUpdateMenu(ctx, message, keyboard);
     }
     
+    // Extract first number from package name for amount
+    const amountMatch = packageName.match(/^(\d+)/);
+    const amount = amountMatch ? amountMatch[1] : '0';
+    
     // Ask for Free Fire UID
     ctx.session.almaz = {
       step: 'uid',
       package: packageName,
       price: price,
-      amount: packageName.includes('105') ? '105' : '180' // Set amount based on package
+      amount: amount
     };
     
     const keyboard = [
