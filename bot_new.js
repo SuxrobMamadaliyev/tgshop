@@ -4582,10 +4582,75 @@ bot.action('back:premium_stars', async (ctx) => {
 });
 
 // Text message handler for purchase username input, Free Fire UID, and other text inputs
+// Handle Free Fire UID input
 bot.on('text', async (ctx, next) => {
   try {
     console.log('Text message received:', ctx.message.text);
     console.log('Current session:', JSON.stringify(ctx.session, null, 2));
+    
+    // Check if we're expecting a Free Fire UID
+    if (ctx.session.almaz && ctx.session.almaz.step === 'uid') {
+      const uid = ctx.message.text.trim();
+      const { package: packageName, price } = ctx.session.almaz;
+      const userId = ctx.from.id;
+      
+      // Validate UID (only numbers, at least 5 digits)
+      if (!/^\d{5,}$/.test(uid)) {
+        await ctx.reply('❌ Noto\'g\'ri Free Fire ID formati! Iltimos, faqat raqamlardan foydalaning (masalan: 123456789)');
+        return;
+      }
+      
+      // Deduct balance
+      updateUserBalance(userId, -price);
+      
+      // Create order
+      const orderId = generateOrderId();
+      const order = {
+        id: orderId,
+        userId: userId,
+        username: ctx.from.username || 'Noma\'lum',
+        type: 'freefire',
+        package: packageName,
+        amount: price,
+        uid: uid,
+        status: 'pending',
+        timestamp: new Date().toISOString()
+      };
+      
+      // Save order to file
+      const orders = JSON.parse(fs.readFileSync('orders.json', 'utf8') || '[]');
+      orders.push(order);
+      fs.writeFileSync('orders.json', JSON.stringify(orders, null, 2));
+      
+      // Notify user
+      await ctx.reply(`✅ Buyurtma qabul qilindi!\n\n` +
+        `💎 Paket: ${packageName}\n` +
+        `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+        `🆔 Free Fire ID: ${uid}\n` +
+        `📝 Buyurtma ID: ${orderId}\n\n` +
+        `Buyurtmangiz tez orada amalga oshiriladi.`);
+      
+      // Notify admins
+      const adminMessage = `🆕 *Yangi Free Fire buyurtmasi*\n` +
+        `👤 Foydalanuvchi: @${ctx.from.username || 'Noma\'lum'} (${userId})\n` +
+        `💎 Paket: ${packageName}\n` +
+        `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+        `🆔 Free Fire ID: ${uid}\n` +
+        `📝 Buyurtma ID: ${orderId}`;
+      
+      for (const adminId of ADMIN_IDS) {
+        try {
+          await ctx.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' });
+        } catch (error) {
+          console.error(`Failed to notify admin ${adminId}:`, error);
+        }
+      }
+      
+      // Clear session
+      delete ctx.session.almaz;
+      await sendMainMenu(ctx);
+      return;
+    }
     
     // Initialize session if it doesn't exist
     if (!ctx.session) {
