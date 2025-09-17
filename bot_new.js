@@ -216,14 +216,28 @@ bot.start(async (ctx) => {
 // Referral bonus amount
 const REFERRAL_BONUS = 100; // 100 so'm for each successful referral
 
-// --- Almaz narxlari (asosiy + bonus) ---
+// --- Free Fire Almaz narxlari ---
 const ALMAZ_PRICES = {
-  '100+80': 14000,       // 100 + 80 diamantes
-  '310+249': 41000,      // 310 + 249 diamantes
-  '520+416': 72000,      // 520 + 416 diamantes
-  '1060+848': 144000,    // 1060 + 848 diamantes
-  '2180+1853': 274000,   // 2180 + 1853 diamantes
-  '5600+4760': 719000    // 5600 + 4760 diamantes
+  '105 yoki 180': 15000,
+  '210 yoki 285': 30000,
+  '326 yoki 559': 45000,
+  '431 yoki 664': 60000,
+  '546 yoki 936': 75000,
+  '651 yoki 1041': 90000,
+  '756 yoki 1262': 105000,
+  '872 yoki 1262': 120000,
+  '1113 yoki 1980': 150000,
+  '1439 yoki 2306': 195000,
+  '1659 yoki 2528': 230000,
+  '1985 yoki 4033': 275000,
+  '2398 yoki 4033': 315000,
+  '2944 yoki 4033': 395000,
+  '3511 yoki 5146': 470000,
+  '4074 yoki 6431': 550000,
+  '4796 yoki 6431': 645000,
+  '6160 yoki 10360': 700000,
+  '12320 yoki 16520': 1400000,
+  '24640 yoki 28840': 2700000
 };
 
 // --- PUBG Mobile UC narxlari (kengaytirilgan) ---
@@ -618,6 +632,7 @@ const MAIN_MENU = [
   'Hisobim',
   'TG Premium & Stars',
   'PUBG Mobile UC / PP',
+  'Free Fire Almaz',
   'UC Shop',
   'SOS',
   'Promokod',
@@ -946,6 +961,52 @@ bot.action('admin:addChannel', async (ctx) => {
   );
 });
 
+// Free Fire diamond purchase menu
+function sendFreeFireMenu(ctx) {
+  const keyboard = [
+    [Markup.button.callback('💎 Almaz Sotib Olish', 'freefire:buy_almaz')],
+    [Markup.button.callback('⬅️ Orqaga', 'back:main')]
+  ];
+  return sendOrUpdateMenu(ctx, '🔥 Free Fire - Xizmatlar', keyboard);
+}
+
+// Show Free Fire diamond packages
+async function sendAlmazMenu(ctx, customMessage = '') {
+  const userId = ctx.from.id;
+  const userBalance = getUserBalance(userId);
+  
+  // Create buttons for each diamond package
+  const keyboard = [];
+  
+  for (const [packageName, price] of Object.entries(ALMAZ_PRICES)) {
+    keyboard.push([
+      Markup.button.callback(
+        `💎 ${packageName} - ${price.toLocaleString()} so'm`,
+        `freefire:buy:${packageName}:${price}`
+      )
+    ]);
+  }
+  
+  // Add back button
+  keyboard.push([
+    Markup.button.callback('💳 Hisobni to\'ldirish', 'topup:amount')
+  ]);
+  keyboard.push([
+    Markup.button.callback('⬅️ Orqaga', 'back:main')
+  ]);
+  
+  // Prepare the message
+  let almazMessage = `💎 *Free Fire - Almaz Sotib Olish*\n\n`;
+  almazMessage += `💰 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n\n`;
+  almazMessage += `Quyidagi almaz paketlaridan birini tanlang:`;
+  
+  // Add custom message if provided
+  if (customMessage) {
+    almazMessage = customMessage + '\n\n' + almazMessage;
+  }
+  
+  return sendOrUpdateMenu(ctx, almazMessage, keyboard);
+}
 
 function sendPubgMenu(ctx) {
   const keyboard = [
@@ -960,6 +1021,15 @@ function sendPubgMenu(ctx) {
 async function sendUcMenu(ctx, customMessage = '') {
   const userId = ctx.from.id;
   const userBalance = getUserBalance(userId);
+  
+  let ucMessage = '🎮 *PUBG Mobile UC Paketlari*\n\n';
+  ucMessage += `💰 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n\n`;
+  ucMessage += 'Quyidagi UC paketlaridan birini tanlang:';
+  
+  // Add custom message if provided
+  if (customMessage) {
+    ucMessage = customMessage + '\n\n' + ucMessage;
+  }
   
   // Show all packages without balance check
   const keyboard = [];
@@ -1605,11 +1675,11 @@ bot.action(/^menu:(.+)/, async (ctx) => {
       case 'TG Premium & Stars':
         await sendPremiumMenu(ctx);
         break;
-      case 'Free Fire Almaz':
-        await ctx.answerCbQuery('Ushbu bo\'lim tez orada ishga tushadi!');
-        break;
       case 'PUBG Mobile UC / PP':
         await sendPubgMenu(ctx);
+        break;
+      case 'Free Fire Almaz':
+        await sendFreeFireMenu(ctx);
         break;
       case 'UC Shop':
         await sendUCShop(ctx);
@@ -1636,6 +1706,61 @@ bot.action(/^menu:(.+)/, async (ctx) => {
   }
 });
 
+// Handle Free Fire diamond purchase
+bot.action(/^freefire:buy:(.+):(\d+)$/, async (ctx) => {
+  try {
+    const packageName = ctx.match[1];
+    const price = parseInt(ctx.match[2]);
+    const userId = ctx.from.id;
+    const userBalance = getUserBalance(userId);
+    
+    // Check if user has enough balance
+    if (userBalance < price) {
+      const needed = price - userBalance;
+      const keyboard = [
+        [Markup.button.callback('💳 Hisobni to\'ldirish', 'topup:amount')],
+        [Markup.button.callback('⬅️ Orqaga', 'back:freefire')]
+      ];
+      
+      const message = `❌ *Yetarli mablag' mavjud emas!*\n\n` +
+        `Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n` +
+        `Kerakli summa: *${price.toLocaleString()} so'm*\n` +
+        `Yetishmayotgan summa: *${needed.toLocaleString()} so'm*\n\n` +
+        `Iltimos, hisobingizni to'ldiring yoki kichikroq miqdordagi almaz tanlang.`;
+      
+      return await sendOrUpdateMenu(ctx, message, keyboard);
+    }
+    
+    // Ask for Free Fire UID
+    ctx.session.almaz = {
+      step: 'uid',
+      package: packageName,
+      price: price
+    };
+    
+    const keyboard = [
+      [Markup.button.callback('❌ Bekor qilish', 'back:freefire')]
+    ];
+    
+    const message = `🆔 Iltimos, Free Fire ID raqamingizni yuboring.\n\n` +
+      `💎 Paket: *${packageName}*\n` +
+      `💰 Narxi: *${price.toLocaleString()} so'm*\n\n` +
+      `ID raqamingizni shu ko'rinishda yuboring:\n\`1234567890\``;
+    
+    return await sendOrUpdateMenu(ctx, message, keyboard);
+  } catch (error) {
+    console.error('Free Fire purchase error:', error);
+    await ctx.answerCbQuery('Xatolik yuz berdi! Iltimos qaytadan urinib ko\'ring.');
+    return await sendFreeFireMenu(ctx);
+  }
+});
+
+// Handle Free Fire menu
+bot.action('freefire:buy_almaz', async (ctx) => {
+  await ctx.answerCbQuery();
+  return await sendAlmazMenu(ctx);
+});
+
 // Handle back button
 bot.action(/^back:(.+)/, async (ctx) => {
   const target = ctx.match[1];
@@ -1652,6 +1777,10 @@ bot.action(/^back:(.+)/, async (ctx) => {
         
       case 'pubg':
         await sendPubgMenu(ctx);
+        break;
+        
+      case 'freefire':
+        await sendFreeFireMenu(ctx);
         break;
         
       case 'uc_shop':
@@ -4452,7 +4581,7 @@ bot.action('back:premium_stars', async (ctx) => {
   }
 });
 
-// Text message handler for purchase username input and other text inputs
+// Text message handler for purchase username input, Free Fire UID, and other text inputs
 bot.on('text', async (ctx, next) => {
   try {
     console.log('Text message received:', ctx.message.text);
@@ -4462,6 +4591,81 @@ bot.on('text', async (ctx, next) => {
     if (!ctx.session) {
       ctx.session = {};
       console.log('Initialized new session');
+    }
+
+    // Handle Free Fire UID input
+    if (ctx.session.almaz && ctx.session.almaz.step === 'uid') {
+      const uid = ctx.message.text.trim();
+      const { package: packageName, price } = ctx.session.almaz;
+      const userId = ctx.from.id;
+      
+      // Validate UID (basic check for numbers only)
+      if (!/^\d+$/.test(uid)) {
+        await ctx.reply('❌ Noto\'g\'ri ID formati! Iltimos, faqat raqamlardan foydalaning.');
+        return;
+      }
+      
+      // Check balance again (in case it changed)
+      const userBalance = getUserBalance(userId);
+      if (userBalance < price) {
+        await ctx.reply(`❌ Hisobingizda yetarli mablag' yo'q. Iltimos, hisobingizni to'ldiring.`);
+        delete ctx.session.almaz;
+        return await sendAlmazMenu(ctx);
+      }
+      
+      // Deduct balance
+      updateUserBalance(userId, -price);
+      
+      // Generate order ID
+      const orderId = generateOrderId();
+      
+      // Save order
+      if (!orders) orders = {};
+      orders[orderId] = {
+        type: 'freefire',
+        package: packageName,
+        price: price,
+        uid: uid,
+        userId: userId,
+        username: ctx.from.username || `${ctx.from.first_name}${ctx.from.last_name ? ' ' + ctx.from.last_name : ''}`,
+        status: 'pending',
+        timestamp: new Date().toISOString()
+      };
+      
+      // Save orders to file
+      fs.writeFileSync(ORDERS_FILE, JSON.stringify(orders, null, 2));
+      
+      // Notify user
+      await ctx.reply(`✅ Buyurtma qabul qilindi!\n\n` +
+        `📦 Buyurtma ID: ${orderId}\n` +
+        `💎 Paket: ${packageName}\n` +
+        `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+        `🆔 Free Fire ID: ${uid}\n\n` +
+        `Buyurtmangiz tez orada amalga oshiriladi.`);
+      
+      // Notify admin
+      const adminMessage = `🆕 *Yangi Free Fire Buyurtma!*\n\n` +
+        `🆔 Buyurtma ID: ${orderId}\n` +
+        `👤 Foydalanuvchi: @${ctx.from.username || 'nousername'} (${userId})\n` +
+        `💎 Paket: ${packageName}\n` +
+        `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+        `🆔 Free Fire ID: ${uid}\n\n` +
+        `✅ Buyurtma qabul qilindi.`;
+      
+      // Send notification to all admins
+      for (const adminId of ADMIN_IDS) {
+        try {
+          await ctx.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' });
+        } catch (error) {
+          console.error(`Failed to send notification to admin ${adminId}:`, error);
+        }
+      }
+      
+      // Clear session
+      delete ctx.session.almaz;
+      
+      // Show main menu
+      return await sendMainMenu(ctx);
     }
     
     // Handle purchase username input
