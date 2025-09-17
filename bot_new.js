@@ -297,20 +297,30 @@ bot.use(session({
 // --- Almaz sotib olish bosqichlari ---
 bot.action('buy:almaz', async (ctx) => {
   await sendOrUpdateMenu(ctx, 'Qancha Almaz sotib olmoqchisiz?', [
-    [Markup.button.callback('105 yoki 180', 'freefire:buy:105 yoki 180:1000')],
-    [Markup.button.callback('210 yoki 360', 'freefire:buy:210 yoki 360:2000')],
-    [Markup.button.callback('530 yoki 720', 'freefire:buy:530 yoki 720:5000')],
-    [Markup.button.callback('1060 yoki 1900', 'freefire:buy:1060 yoki 1900:10000')],
-    [Markup.button.callback('2180 yoki 4000', 'freefire:buy:2180 yoki 4000:20000')],
+    [Markup.button.callback('105 yoki 180', 'almaz:amount:105 yoki 180')],
+    [Markup.button.callback('210 yoki 360', 'almaz:amount:210 yoki 360')],
+    [Markup.button.callback('530 yoki 720', 'almaz:amount:530 yoki 720')],
+    [Markup.button.callback('1060 yoki 1900', 'almaz:amount:1060 yoki 1900')],
+    [Markup.button.callback('2180 yoki 4000', 'almaz:amount:2180 yoki 4000')],
     [Markup.button.callback('⬅️ Orqaga', 'back:main')]
   ]);
 });
 
 // Handle Free Fire diamond amount selection
-bot.action(/^freefire:buy:(.+):(\d+)$/, async (ctx) => {
+bot.action(/^almaz:amount:(.+)$/, async (ctx) => {
   try {
     const packageName = ctx.match[1].trim();
-    const price = parseInt(ctx.match[2]);
+    
+    // Define package prices
+    const prices = {
+      '105 yoki 180': 1000,
+      '210 yoki 360': 2000,
+      '530 yoki 720': 5000,
+      '1060 yoki 1900': 10000,
+      '2180 yoki 4000': 20000
+    };
+    
+    const price = prices[packageName] || 0;
     const userId = ctx.from.id;
     const userBalance = getUserBalance(userId);
     
