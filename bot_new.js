@@ -915,43 +915,45 @@ bot.action(/pubg:uc:(\d+):(\d+)/, async (ctx) => {
       );
     }
     
-    // Create pending order for admin confirmation
-    const orderId = generateOrderId();
-    pendingOrders[orderId] = {
-      userId: ctx.from.id,
+    // Ask for PUBG ID first
+    ctx.session.pendingOrder = {
       type: 'pubg_uc',
       amount: amount,
       price: price,
-      status: 'pending',
       username: ctx.from.username || ctx.from.first_name,
-      timestamp: Date.now()
+      userId: ctx.from.id
     };
     
-    // Notify user that order is pending admin approval
     await sendOrUpdateMenu(
       ctx,
-      `✅ *Buyurtma qabul qilindi!*\n\n` +
+      `🔢 *PUBG ID raqamingizni yuboring*\n\n` +
       `📦 Miqdor: *${amount} UC*\n` +
-      `💳 To'lov miqdori: *${price.toLocaleString()} so'm*\n` +
-      `🆔 Buyurtma ID: ${orderId}\n\n` +
-      `⏳ Iltimos, admin tasdigini kuting. Sizga xabar beramiz!`,
-      [[Markup.button.callback('🏠 Bosh menyu', 'back:main')]]
+      `💳 To'lov miqdori: *${price.toLocaleString()} so'm*\n\n` +
+      `ℹ Iltimos, o'yindagi to'liq foydalanuvchi nomingizni yozing.`,
+      [[Markup.button.callback('⬅️ Orqaga', 'pubg:buy_uc')]]
     );
-    
-    // Notify admins
-    const adminMessage = `🆕 *Yangi UC buyurtma!*\n\n` +
-      `👤 Foydalanuvchi: @${ctx.from.username || 'foydalanuvchi_nomi_yo\'q'}\n` +
-      `🆔 ID: ${ctx.from.id}\n` +
-      `📦 Miqdor: ${amount} UC\n` +
-      `💰 Narxi: ${price.toLocaleString()} so'm\n` +
-      `🆔 Buyurtma ID: ${orderId}\n\n` +
-      `✅ Tasdiqlash: /confirm_${orderId}\n` +
-      `❌ Bekor qilish: /cancel_${orderId}`;
+      
+    const adminKeyboard = [
+      [
+        Markup.button.callback('✅ Tasdiqlash', `admin_confirm:${orderId}:${ctx.from.id}`),
+        Markup.button.callback('❌ Bekor qilish', `admin_cancel:${orderId}:${ctx.from.id}`)
+      ]
+    ];
     
     // Send notification to all admins
     for (const adminId of ADMIN_IDS) {
       try {
-        await ctx.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' });
+        await ctx.telegram.sendMessage(adminId, adminMessage, { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '✅ Tasdiqlash', callback_data: `admin_confirm:${orderId}:${ctx.from.id}` },
+                { text: '❌ Bekor qilish', callback_data: `admin_cancel:${orderId}:${ctx.from.id}` }
+              ]
+            ]
+          }
+        });
       } catch (error) {
         console.error(`Xatolik admin xabarini yuborishda (${adminId}):`, error);
       }
@@ -960,6 +962,185 @@ bot.action(/pubg:uc:(\d+):(\d+)/, async (ctx) => {
     console.error('UC paketini tanlashda xatolik:', error);
     await ctx.reply('⚠️ Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
     return sendPubgMenu(ctx);
+  }
+});
+
+// Admin order confirmation
+bot.action(/admin_confirm:(\w+):(\d+)/, async (ctx) => {
+  try {
+    const orderId = ctx.match[1];
+    const userId = ctx.match[2];
+    const order = pendingOrders[orderId];
+
+    if (!order) {
+      return ctx.answerCbQuery('❌ Buyurtma topilmadi yoki allaqachon qayta ishlangan');
+    }
+
+    // Update order status
+    order.status = 'completed';
+    
+    // Deduct balance if not already done
+    const userBalance = getUserBalance(order.userId);
+    if (userBalance >= order.price) {
+      // Update user balance
+      updateUserBalance(order.userId, -order.price);
+    }
+    
+    // Notify user
+    const userMessage = `✅ *Buyurtmangiz tasdiqlandi!*\n\n` +
+      `📦 Buyurtma ID: ${orderId}\n` +
+      `💳 Miqdor: ${order.amount} ${order.type === 'pubg_uc' ? 'UC' : 'PP'}\n` +
+      `💰 Summa: ${order.price.toLocaleString()} so'm\n\n` +
+      `📝 Iltimos, kuting. Tez orada siz bilan bog'lanamiz!`;
+
+    try {
+      await ctx.telegram.sendMessage(order.userId, userMessage, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Xatolik foydalanuvchiga xabar yuborishda:', error);
+    }
+
+    // Update admin message
+    await ctx.editMessageText(
+      `✅ *Buyurtma tasdiqlandi*\n\n` +
+      `👤 Foydalanuvchi: @${order.username || 'noma\'lum'}\n` +
+      `🆔 User ID: ${order.userId}\n` +
+      `📦 Miqdor: ${order.amount} ${order.type === 'pubg_uc' ? 'UC' : 'PP'}\n` +
+      `💰 Narxi: ${order.price.toLocaleString()} so'm\n` +
+      `🆔 Buyurtma ID: ${orderId}\n` +
+      `👨‍💼 Tasdiqlovchi: @${ctx.from.username || 'admin'}`,
+      { parse_mode: 'Markdown' }
+    );
+    
+    // Remove from pending orders
+    delete pendingOrders[orderId];
+    
+  } catch (error) {
+    console.error('Buyurtmani tasdiqlashda xatolik:', error);
+    await ctx.answerCbQuery('❌ Xatolik yuz berdi');
+  }
+});
+
+// Admin order cancellation
+// Handle text messages (for PUBG ID input)
+bot.on('text', async (ctx, next) => {
+  try {
+    // Skip if not in pending order state
+    if (!ctx.session.pendingOrder) {
+      return next();
+    }
+    
+    const pubgId = ctx.message.text.trim();
+    const { type, amount, price, username, userId } = ctx.session.pendingOrder;
+    
+    // Validate PUBG ID (basic validation)
+    if (!pubgId || pubgId.length < 3) {
+      return ctx.reply('❌ Noto\'g\'ri PUBG ID kiritildi. Iltimos, qaytadan urinib ko\'ring.');
+    }
+    
+    // Create order
+    const orderId = generateOrderId();
+    pendingOrders[orderId] = {
+      userId,
+      type,
+      amount,
+      price,
+      pubgId,
+      status: 'pending',
+      username,
+      timestamp: Date.now()
+    };
+    
+    // Clear pending order from session
+    delete ctx.session.pendingOrder;
+    
+    // Notify user
+    await ctx.reply(
+      `✅ *Buyurtma qabul qilindi!*\n\n` +
+      `📦 Miqdor: *${amount} ${type === 'pubg_uc' ? 'UC' : 'PP'}*\n` +
+      `💳 To'lov miqdori: *${price.toLocaleString()} so'm*\n` +
+      `🆔 Buyurtma ID: ${orderId}\n` +
+      `👤 PUBG ID: ${pubgId}\n\n` +
+      `⏳ Iltimos, admin tasdigini kuting. Sizga xabar beramiz!`,
+      { parse_mode: 'Markdown' }
+    );
+    
+    // Notify admins
+    const adminMessage = `🆕 *Yangi ${type === 'pubg_uc' ? 'UC' : 'PP'} buyurtma!*\n\n` +
+      `👤 Foydalanuvchi: @${username || 'foydalanuvchi_nomi_yo\'q'}\n` +
+      `🆔 User ID: ${userId}\n` +
+      `🎮 PUBG ID: ${pubgId}\n` +
+      `📦 Miqdor: ${amount} ${type === 'pubg_uc' ? 'UC' : 'PP'}\n` +
+      `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+      `🆔 Buyurtma ID: ${orderId}`;
+    
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await ctx.telegram.sendMessage(adminId, adminMessage, { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '✅ Tasdiqlash', callback_data: `admin_confirm:${orderId}:${userId}` },
+                { text: '❌ Bekor qilish', callback_data: `admin_cancel:${orderId}:${userId}` }
+              ]
+            ]
+          }
+        });
+      } catch (error) {
+        console.error(`Xatolik admin xabarini yuborishda (${adminId}):`, error);
+      }
+    }
+    
+  } catch (error) {
+    console.error('PUBG ID qabul qilishda xatolik:', error);
+    await ctx.reply('⚠️ Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
+  }
+});
+
+bot.action(/admin_cancel:(\w+):(\d+)/, async (ctx) => {
+  try {
+    const orderId = ctx.match[1];
+    const userId = ctx.match[2];
+    const order = pendingOrders[orderId];
+
+    if (!order) {
+      return ctx.answerCbQuery('❌ Buyurtma topilmadi yoki allaqachon qayta ishlangan');
+    }
+
+    // Update order status
+    order.status = 'cancelled';
+    
+    // Notify user
+    const userMessage = `❌ *Buyurtmangiz bekor qilindi!*\n\n` +
+      `📦 Buyurtma ID: ${orderId}\n` +
+      `💳 Miqdor: ${order.amount} ${order.type === 'pubg_uc' ? 'UC' : 'PP'}\n` +
+      `💰 Summa: ${order.price.toLocaleString()} so'm\n\n` +
+      `ℹ Iltimos, qaytadan urinib ko'ring yoki admin bilan bog'laning.`;
+
+    try {
+      await ctx.telegram.sendMessage(order.userId, userMessage, { parse_mode: 'Markdown' });
+    } catch (error) {
+      console.error('Xatolik foydalanuvchiga xabar yuborishda:', error);
+    }
+
+    // Update admin message
+    await ctx.editMessageText(
+      `❌ *Buyurtma bekor qilindi*\n\n` +
+      `👤 Foydalanuvchi: @${order.username || 'noma\'lum'}\n` +
+      `🆔 User ID: ${order.userId}\n` +
+      `📦 Miqdor: ${order.amount} ${order.type === 'pubg_uc' ? 'UC' : 'PP'}\n` +
+      `💰 Narxi: ${order.price.toLocaleString()} so'm\n` +
+      `🆔 Buyurtma ID: ${orderId}\n` +
+      `👨‍💼 Bekor qiluvchi: @${ctx.from.username || 'admin'}`,
+      { parse_mode: 'Markdown' }
+    );
+    
+    // Remove from pending orders
+    delete pendingOrders[orderId];
+    
+  } catch (error) {
+    console.error('Buyurtmani bekor qilishda xatolik:', error);
+    await ctx.answerCbQuery('❌ Xatolik yuz berdi');
   }
 });
 
@@ -993,43 +1174,38 @@ bot.action(/pubg:pp:(\d+):(\d+)/, async (ctx) => {
       );
     }
     
-    // Create pending order for admin confirmation
-    const orderId = generateOrderId();
-    pendingOrders[orderId] = {
-      userId: ctx.from.id,
+    // Ask for PUBG ID first
+    ctx.session.pendingOrder = {
       type: 'pubg_pp',
       amount: amount,
       price: price,
-      status: 'pending',
       username: ctx.from.username || ctx.from.first_name,
-      timestamp: Date.now()
+      userId: ctx.from.id
     };
     
-    // Notify user that order is pending admin approval
     await sendOrUpdateMenu(
       ctx,
-      `✅ *Buyurtma qabul qilindi!*\n\n` +
+      `🔢 *PUBG ID raqamingizni yuboring*\n\n` +
       `📦 Miqdor: *${amount} PP*\n` +
-      `💳 To'lov miqdori: *${price.toLocaleString()} so'm*\n` +
-      `🆔 Buyurtma ID: ${orderId}\n\n` +
-      `⏳ Iltimos, admin tasdigini kuting. Sizga xabar beramiz!`,
-      [[Markup.button.callback('🏠 Bosh menyu', 'back:main')]]
+      `💳 To'lov miqdori: *${price.toLocaleString()} so'm*\n\n` +
+      `ℹ Iltimos, o'yindagi to'liq foydalanuvchi nomingizni yozing.`,
+      [[Markup.button.callback('⬅️ Orqaga', 'pubg:buy_pp')]]
     );
-    
-    // Notify admins
-    const adminMessage = `🆕 *Yangi PP buyurtma!*\n\n` +
-      `👤 Foydalanuvchi: @${ctx.from.username || 'foydalanuvchi_nomi_yo\'q'}\n` +
-      `🆔 ID: ${ctx.from.id}\n` +
-      `📦 Miqdor: ${amount} PP\n` +
-      `💰 Narxi: ${price.toLocaleString()} so'm\n` +
-      `🆔 Buyurtma ID: ${orderId}\n\n` +
-      `✅ Tasdiqlash: /confirm_${orderId}\n` +
-      `❌ Bekor qilish: /cancel_${orderId}`;
     
     // Send notification to all admins
     for (const adminId of ADMIN_IDS) {
       try {
-        await ctx.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' });
+        await ctx.telegram.sendMessage(adminId, adminMessage, { 
+          parse_mode: 'Markdown',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '✅ Tasdiqlash', callback_data: `admin_confirm:${orderId}:${ctx.from.id}` },
+                { text: '❌ Bekor qilish', callback_data: `admin_cancel:${orderId}:${ctx.from.id}` }
+              ]
+            ]
+          }
+        });
       } catch (error) {
         console.error(`Xatolik admin xabarini yuborishda (${adminId}):`, error);
       }
