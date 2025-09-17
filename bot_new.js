@@ -3107,8 +3107,8 @@ bot.action('topup:check_payment', async (ctx) => {
 
   // Format message with MarkdownV2
   const adminMessage = '💳 *Yangi to\'lov so\'rovi*\n' +
-    '👤 Foydalanuvchi: ' + escapeMarkdown('@' + username) + ' \\(' + 'ID: ' + userId + '\\)\n' +
-    '💰 Summa: ' + escapeMarkdown(amount.toLocaleString()) + ' so\'m\n' +
+    '👤 Foydalanuvchi: ' + escapeMarkdownV2('@' + username) + ' \\(' + 'ID: ' + userId + '\\)\n' +
+    '💰 Summa: ' + escapeMarkdownV2(amount.toLocaleString()) + ' so\'m\n' +
     '💳 To\'lov usuli: ' + (method === 'uzcard' ? 'Uzcard' : 'Humo') + '\n' +
     '💸 To\'lov summasi: ' + escapeMarkdown(paymentAmount.toLocaleString()) + ' so\'m\n' +
     '📅 Sana: ' + escapeMarkdown(new Date().toLocaleString()) + '\n\n' +
@@ -3672,31 +3672,28 @@ bot.on('text', async (ctx, next) => {
     }
     ctx.session.myOrders.push(orderId);
     
-    // Clear buying state
-    ctx.session.buying = null;
-    
     // Send confirmation to user
     await ctx.replyWithMarkdown(
-      `✅ Sotib olish so'rovi qabul qilindi!\n\n` +
-      `📦 Mahsulot: *${amount} ${productType}*\n` +
-      `👤 O'yinchi: *${username}*\n` +
-      `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
-      `💰 Joriy balans: *${userBalance.toLocaleString()} so'm*\n\n` +
-      `🆔 Buyurtma raqami: *${orderId}*\n` +
+      `✅ Sotib olish so'rovi qabul qilindi\!\n\n` +
+      `📦 Mahsulot: *${escapeMarkdownV2(amount + ' ' + productType)}*\n` +
+      `👤 O'yinchi: *${escapeMarkdownV2(username)}*\n` +
+      `💰 Narxi: *${escapeMarkdownV2(price.toLocaleString())} so'm*\n` +
+      `💳 Joriy balans: *${escapeMarkdownV2(userBalance.toLocaleString())} so'm*\n\n` +
+      `🆔 Buyurtma raqami: *${escapeMarkdownV2(orderId)}*\n` +
       `📞 Aloqa: @d1yor_salee\n\n` +
-      `💡 Iltimos, to'lovni tasdiqlash uchun adminlarimiz kuting.`,
-      { parse_mode: 'Markdown' }
+      `💡 Iltimos, to'lovni tasdiqlash uchun adminlarimiz kuting\.`,
+      { parse_mode: 'MarkdownV2' }
     );
     
     // Notify admin
-    const adminMessage = `🆕 *Yangi PUBG ${productType} Sotuv!*\n\n` +
-      `🆔 Buyurtma: #${orderId}\n` +
-      `👤 Foydalanuvchi: [${ctx.from.first_name}](tg://user?id=${ctx.from.id}) (ID: ${ctx.from.id})\n` +
-      `📱 O'yinchi: *${username}*\n` +
-      `📦 Miqdor: *${amount} ${productType}*\n` +
-      `💵 Narx: *${price.toLocaleString()} so'm*\n` +
-      `💰 Balans: *${userBalance.toLocaleString()} so'm*\n` +
-      `⏰ Vaqt: ${new Date().toLocaleString()}`;
+    const adminMessage = `🆕 *Yangi PUBG ${escapeMarkdownV2(productType)} Sotuv\!*\n\n` +
+      `🆔 *Buyurtma:* \`#${escapeMarkdownV2(orderId)}\`\n` +
+      `👤 *Foydalanuvchi:* [${escapeMarkdownV2(ctx.from.first_name || 'Noma\'lum')}](tg://user?id=${ctx.from.id}) \(ID: ${ctx.from.id}\)\n` +
+      `📱 *O'yinchi:* \`${escapeMarkdownV2(username)}\`\n` +
+      `📦 *Miqdor:* ${escapeMarkdownV2(amount + ' ' + productType)}\n` +
+      `💵 *Narx:* ${escapeMarkdownV2(price.toLocaleString())} so'm\n` +
+      `💰 *Balans:* ${escapeMarkdownV2(userBalance.toLocaleString())} so'm\n` +
+      `⏰ *Vaqt:* ${escapeMarkdownV2(new Date().toLocaleString())}`;
     
     // Send to all admins
     for (const adminId of ADMIN_IDS) {
@@ -4646,11 +4643,12 @@ bot.on('text', async (ctx, next) => {
         const orderId = 'ORD-' + Date.now();
         
         // Notify user
-        await ctx.reply(`✅ Sotib olish muvaffaqiyatli amalga oshirildi!\n\n` +
-          `📝 Buyurtma ma\'lumotlari:\n` +
-          `🆔 Buyurtma ID: ${orderId}\n` +
-          `📦 Mahsulot: ${type === 'premium' ? `Telegram Premium ${amount} oy` : `${amount} Stars`}\n` +
-          `👤 Foydalanuvchi: ${username}\n` +
+        await ctx.replyWithMarkdown(
+          `✅ Sotib olish muvaffaqiyatli amalga oshirildi\!` +
+          `📝 *Buyurtma ma'lumotlari:*\n` +
+          `🆔 *Buyurtma ID:* \`${escapeMarkdownV2(orderId)}\`\n` +
+          `📦 *Mahsulot:* ${escapeMarkdownV2(type === 'premium' ? `Telegram Premium ${amount} oy` : `${amount} Stars`)}\n` +
+          `👤 Foydalanuvchi: ${escapeMarkdownV2(username)}\n` +
           `💰 Narxi: ${price.toLocaleString()} so'm\n\n` +
           `Ishonch xizmati: @d1yor_salee`);
         
