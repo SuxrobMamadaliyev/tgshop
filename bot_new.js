@@ -296,54 +296,62 @@ bot.use(session({
 
 // --- Almaz sotib olish bosqichlari ---
 bot.action('buy:almaz', async (ctx) => {
-  ctx.session.almaz = { step: 'amount' };
-  
-  // Create buttons for each diamond package
-  const keyboard = [];
-  
-  // Add buttons for each diamond package in ALMAZ_PRICES
-  for (const [packageName, price] of Object.entries(ALMAZ_PRICES)) {
-    keyboard.push([
-      Markup.button.callback(
-        `${packageName} Almaz - ${price.toLocaleString()} so'm`,
-        `almaz:amount:${packageName}`
-      )
-    ]);
-  }
-  
-  // Add back button
-  keyboard.push([Markup.button.callback('⬅️ Orqaga', 'back:main')]);
-  
-  await sendOrUpdateMenu(ctx, 'Qancha Almaz sotib olmoqchisiz?', keyboard);
-});
-
-bot.action(/almaz:amount:(.+)/, async (ctx) => {
-  const packageName = ctx.match[1];
-  const userId = ctx.from.id;
-  const price = ALMAZ_PRICES[packageName];
-  
-  if (!price) {
-    await ctx.answerCbQuery('❌ Xatolik: Bunday paket topilmadi');
-    return;
-  }
-  
-  const userBalance = getUserBalance(userId);
-  if (userBalance < price) {
-    await sendOrUpdateMenu(
-      ctx,
-      `❌ Mablag' yetarli emas!\n\n💳 Balans: ${userBalance.toLocaleString()} so'm\n💰 Kerak: ${price.toLocaleString()} so'm\n\nBalansingizni to'ldiring va qayta urinib ko'ring.`,
-      [
-        [Markup.button.callback('💳 Balansni to\'ldirish', 'topup:amount')],
-        [Markup.button.callback('⬅️ Orqaga', 'back:main')]
-      ]
-    );
-    delete ctx.session.almaz;
-    return;
-  }
-  ctx.session.almaz = { step: 'uid', amount };
-  await sendOrUpdateMenu(ctx, `Free Fire ID raqamingizni kiriting:\n\nMasalan: 123456789`, [
+  await sendOrUpdateMenu(ctx, 'Qancha Almaz sotib olmoqchisiz?', [
+    [Markup.button.callback('105 yoki 180', 'freefire:buy:105 yoki 180:1000')],
+    [Markup.button.callback('210 yoki 360', 'freefire:buy:210 yoki 360:2000')],
+    [Markup.button.callback('530 yoki 720', 'freefire:buy:530 yoki 720:5000')],
+    [Markup.button.callback('1060 yoki 1900', 'freefire:buy:1060 yoki 1900:10000')],
+    [Markup.button.callback('2180 yoki 4000', 'freefire:buy:2180 yoki 4000:20000')],
     [Markup.button.callback('⬅️ Orqaga', 'back:main')]
   ]);
+});
+
+// Handle Free Fire diamond amount selection
+bot.action(/^freefire:buy:(.+):(\d+)$/, async (ctx) => {
+  try {
+    const packageName = ctx.match[1].trim();
+    const price = parseInt(ctx.match[2]);
+    const userId = ctx.from.id;
+    const userBalance = getUserBalance(userId);
+    
+    if (userBalance < price) {
+      const needed = price - userBalance;
+      const keyboard = [
+        [Markup.button.callback('💳 Hisobni to\'ldirish', 'topup:amount')],
+        [Markup.button.callback('⬅️ Orqaga', 'back:freefire')]
+      ];
+      
+      const message = `❌ *Yetarli mablag' mavjud emas!*\n\n` +
+        `Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n` +
+        `Kerakli summa: *${price.toLocaleString()} so'm*\n` +
+        `Yetishmayotgan summa: *${needed.toLocaleString()} so'm*\n\n` +
+        `Iltimos, hisobingizni to'ldiring yoki kichikroq miqdordagi almaz tanlang.`;
+      
+      return await sendOrUpdateMenu(ctx, message, keyboard);
+    }
+    
+    // Ask for Free Fire UID
+    ctx.session.almaz = {
+      step: 'uid',
+      package: packageName,
+      price: price
+    };
+    
+    const keyboard = [
+      [Markup.button.callback('❌ Bekor qilish', 'back:freefire')]
+    ];
+    
+    const message = `🆔 Iltimos, Free Fire ID raqamingizni yuboring.\n\n` +
+      `💎 Paket: *${packageName}*\n` +
+      `💰 Narxi: *${price.toLocaleString()} so'm*\n\n` +
+      `ID raqamingizni shu ko'rinishda yuboring:\n\`123456789\``;
+    
+    return await sendOrUpdateMenu(ctx, message, keyboard);
+  } catch (error) {
+    console.error('Free Fire purchase error:', error);
+    await ctx.answerCbQuery('Xatolik yuz berdi! Iltimos qaytadan urinib ko\'ring.');
+    return await sendFreeFireMenu(ctx);
+  }
 });
 
 // UID va balans tekshirish
