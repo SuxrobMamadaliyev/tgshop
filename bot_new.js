@@ -1707,9 +1707,9 @@ bot.action(/^menu:(.+)/, async (ctx) => {
 });
 
 // Handle Free Fire diamond purchase
-bot.action(/^freefire:buy:(.+):(\d+)$/, async (ctx) => {
+bot.action(/^freefire:buy:(.+?):(\d+)$/, async (ctx) => {
   try {
-    const packageName = ctx.match[1];
+    const packageName = ctx.match[1].trim();
     const price = parseInt(ctx.match[2]);
     const userId = ctx.from.id;
     const userBalance = getUserBalance(userId);
