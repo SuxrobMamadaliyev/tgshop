@@ -302,11 +302,6 @@ bot.use(session({
 // --- Almaz sotib olish bosqichlari ---
 bot.action('buy:almaz', async (ctx) => {
   await sendOrUpdateMenu(ctx, 'Qancha Almaz sotib olmoqchisiz?', [
-    [Markup.button.callback('105 yoki 180 - 1,000 so\'m', 'almaz:amount:105 yoki 180')],
-    [Markup.button.callback('210 yoki 360 - 2,000 so\'m', 'almaz:amount:210 yoki 360')],
-    [Markup.button.callback('530 yoki 720 - 5,000 so\'m', 'almaz:amount:530 yoki 720')],
-    [Markup.button.callback('1,060 yoki 1,900 - 10,000 so\'m', 'almaz:amount:1060 yoki 1900')],
-    [Markup.button.callback('2,180 yoki 4,000 - 20,000 so\'m', 'almaz:amount:2180 yoki 4000')],
     [Markup.button.callback('105 yoki 180 - 15,000 so\'m', 'almaz:amount:105 yoki 180:15000')],
     [Markup.button.callback('210 yoki 285 - 30,000 so\'m', 'almaz:amount:210 yoki 285:30000')],
     [Markup.button.callback('326 yoki 559 - 45,000 so\'m', 'almaz:amount:326 yoki 559:45000')],
@@ -920,18 +915,47 @@ bot.action(/pubg:uc:(\d+):(\d+)/, async (ctx) => {
       );
     }
     
-    // If balance is sufficient, proceed with purchase
-    ctx.session.buying = { type: 'pubg_uc', amount, price };
+    // Create pending order for admin confirmation
+    const orderId = generateOrderId();
+    pendingOrders[orderId] = {
+      userId: ctx.from.id,
+      type: 'pubg_uc',
+      amount: amount,
+      price: price,
+      status: 'pending',
+      username: ctx.from.username || ctx.from.first_name,
+      timestamp: Date.now()
+    };
     
+    // Notify user that order is pending admin approval
     await sendOrUpdateMenu(
       ctx,
-      `💎 *${amount} UC* sotib olish uchun o'yindagi foydalanuvchi nomingizni yuboring:\n\n` +
+      `✅ *Buyurtma qabul qilindi!*\n\n` +
+      `📦 Miqdor: *${amount} UC*\n` +
       `💳 To'lov miqdori: *${price.toLocaleString()} so'm*\n` +
-      `💰 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n` +
-      `📦 Miqdor: *${amount} UC*\n\n` +
-      `ℹ Iltimos, o'yindagi to'liq foydalanuvchi nomingizni yozing.`,
-      [[Markup.button.callback('⬅️ Orqaga', 'pubg:buy_uc')]]
+      `🆔 Buyurtma ID: ${orderId}\n\n` +
+      `⏳ Iltimos, admin tasdigini kuting. Sizga xabar beramiz!`,
+      [[Markup.button.callback('🏠 Bosh menyu', 'back:main')]]
     );
+    
+    // Notify admins
+    const adminMessage = `🆕 *Yangi UC buyurtma!*\n\n` +
+      `👤 Foydalanuvchi: @${ctx.from.username || 'foydalanuvchi_nomi_yo\'q'}\n` +
+      `🆔 ID: ${ctx.from.id}\n` +
+      `📦 Miqdor: ${amount} UC\n` +
+      `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+      `🆔 Buyurtma ID: ${orderId}\n\n` +
+      `✅ Tasdiqlash: /confirm_${orderId}\n` +
+      `❌ Bekor qilish: /cancel_${orderId}`;
+    
+    // Send notification to all admins
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await ctx.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' });
+      } catch (error) {
+        console.error(`Xatolik admin xabarini yuborishda (${adminId}):`, error);
+      }
+    }
   } catch (error) {
     console.error('UC paketini tanlashda xatolik:', error);
     await ctx.reply('⚠️ Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
@@ -969,18 +993,47 @@ bot.action(/pubg:pp:(\d+):(\d+)/, async (ctx) => {
       );
     }
     
-    // If balance is sufficient, proceed with purchase
-    ctx.session.buying = { type: 'pubg_pp', amount, price };
+    // Create pending order for admin confirmation
+    const orderId = generateOrderId();
+    pendingOrders[orderId] = {
+      userId: ctx.from.id,
+      type: 'pubg_pp',
+      amount: amount,
+      price: price,
+      status: 'pending',
+      username: ctx.from.username || ctx.from.first_name,
+      timestamp: Date.now()
+    };
     
+    // Notify user that order is pending admin approval
     await sendOrUpdateMenu(
       ctx,
-      `⭐ *${amount} PP* sotib olish uchun o'yindagi foydalanuvchi nomingizni yuboring:\n\n` +
+      `✅ *Buyurtma qabul qilindi!*\n\n` +
+      `📦 Miqdor: *${amount} PP*\n` +
       `💳 To'lov miqdori: *${price.toLocaleString()} so'm*\n` +
-      `💰 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n` +
-      `📦 Miqdor: *${amount} PP*\n\n` +
-      `ℹ Iltimos, o'yindagi to'liq foydalanuvchi nomingizni yozing.`,
-      [[Markup.button.callback('⬅️ Orqaga', 'pubg:buy_pp')]]
+      `🆔 Buyurtma ID: ${orderId}\n\n` +
+      `⏳ Iltimos, admin tasdigini kuting. Sizga xabar beramiz!`,
+      [[Markup.button.callback('🏠 Bosh menyu', 'back:main')]]
     );
+    
+    // Notify admins
+    const adminMessage = `🆕 *Yangi PP buyurtma!*\n\n` +
+      `👤 Foydalanuvchi: @${ctx.from.username || 'foydalanuvchi_nomi_yo\'q'}\n` +
+      `🆔 ID: ${ctx.from.id}\n` +
+      `📦 Miqdor: ${amount} PP\n` +
+      `💰 Narxi: ${price.toLocaleString()} so'm\n` +
+      `🆔 Buyurtma ID: ${orderId}\n\n` +
+      `✅ Tasdiqlash: /confirm_${orderId}\n` +
+      `❌ Bekor qilish: /cancel_${orderId}`;
+    
+    // Send notification to all admins
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await ctx.telegram.sendMessage(adminId, adminMessage, { parse_mode: 'Markdown' });
+      } catch (error) {
+        console.error(`Xatolik admin xabarini yuborishda (${adminId}):`, error);
+      }
+    }
   } catch (error) {
     console.error('PP paketini tanlashda xatolik:', error);
     await ctx.answerCbQuery('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
