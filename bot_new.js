@@ -376,8 +376,9 @@ bot.on('text', async (ctx, next) => {
     }
     // Adminlarga buyurtma yuborish
     const orderId = generateOrderId();
+    const amount = ctx.session.almaz.amount || packageName; // Fallback to packageName if amount is not set
     ctx.session.almaz = undefined;
-    pendingOrders[orderId] = { userId, type: 'almaz', amount, uid, price };
+    pendingOrders[orderId] = { userId, type: 'almaz', amount, uid, price, package: packageName };
     const adminMessage = `💎 *Yangi Almaz buyurtma*\n` +
       `🆔 Buyurtma ID: ${orderId}\n` +
       `💎 Miqdor: ${amount} Almaz\n` +
