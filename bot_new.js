@@ -368,8 +368,7 @@ bot.action(/^almaz:amount:(.+)$/, async (ctx) => {
 bot.on('text', async (ctx, next) => {
   if (ctx.session.almaz && ctx.session.almaz.step === 'uid') {
     const uid = ctx.message.text.trim();
-    const amount = ctx.session.almaz.amount;
-    const price = ALMAZ_PRICES[amount];
+    const { package: packageName, price } = ctx.session.almaz;
     const userId = ctx.from.id;
     if (!/^[0-9]{5,}$/.test(uid)) {
       await ctx.reply('❌ Iltimos, to\'g\'ri Free Fire ID raqamini kiriting!');
