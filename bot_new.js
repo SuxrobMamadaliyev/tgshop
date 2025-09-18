@@ -54,20 +54,71 @@ bot.use(async (ctx, next) => {
     }
     
     // List of required channels (add your channel usernames here)
-    const requiredChannels = ['HOLYUCSERVIS', 'starschatim'];
+    const requiredChannels = [
+      { username: 'HOLYUCSERVIS', inviteLink: 'https://t.me/HOLYUCSERVIS' },
+      { username: 'starschatim', inviteLink: 'https://t.me/starschatim' }
+    ];
     
     // Check channel subscription
+    let notSubscribedChannels = [];
+    
     for (const channel of requiredChannels) {
       try {
-        const member = await ctx.telegram.getChatMember(`@${channel}`, userId);
+        const member = await ctx.telegram.getChatMember(`@${channel.username}`, userId);
         if (member.status === 'left' || member.status === 'kicked') {
-          console.log(`User ${userId} is not subscribed to @${channel}`);
-          await ctx.reply(`Iltimos, avval @${channel} kanaliga obuna bo'ling !`);
-          return; // Skip processing if not subscribed
+          console.log(`User ${userId} is not subscribed to @${channel.username}`);
+          notSubscribedChannels.push(channel);
         }
       } catch (error) {
-        console.error(`Error checking subscription to @${channel}:`, error);
+        console.error(`Error checking subscription to @${channel.username}:`, error);
+        // If there's an error (like no permissions), we'll still show the channel
+        // but with a direct join link instead of checking subscription
+        notSubscribedChannels.push(channel);
       }
+    }
+    
+    // If user is not subscribed to any required channel, show subscription message
+    if (notSubscribedChannels.length > 0) {
+      const message = `⚠️ *Iltimos, quyidagi kanallarga obuna bo'ling:*\n\n` +
+        notSubscribedChannels.map(channel => 
+          `🔹 [@${channel.username}](${channel.inviteLink})`
+        ).join('\n') +
+        `\n\nObuna bo'lgach, "✅ Obunani tekshirish" tugmasini bosing.`;
+      
+      const keyboard = [
+        [
+          { text: '✅ Obunani tekshirish', callback_data: 'check_subscription' }
+        ]
+      ];
+      
+      try {
+        await ctx.replyWithMarkdownV2(
+          message,
+          {
+            reply_markup: {
+              inline_keyboard: keyboard
+            },
+            disable_web_page_preview: true
+          }
+        );
+      } catch (error) {
+        console.error('Error sending subscription message:', error);
+        // If markdown fails, try with plain text
+        await ctx.reply(
+          `⚠️ Iltimos, quyidagi kanallarga obuna bo'ling:\n\n` +
+          notSubscribedChannels.map(channel => 
+            `🔹 @${channel.username} - ${channel.inviteLink}`
+          ).join('\n') +
+          `\n\nObuna bo'lgach, "Obunani tekshirish" tugmasini bosing.`,
+          {
+            reply_markup: {
+              inline_keyboard: keyboard
+            }
+          }
+        );
+      }
+      
+      return; // Stop further processing until user is subscribed
     }
     
     // Continue to the next middleware/handler
