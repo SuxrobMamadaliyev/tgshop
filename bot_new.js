@@ -4610,11 +4610,12 @@ bot.on('text', async (ctx, next) => {
       console.log('Initialized new session');
     }
     
-    // Handle purchase username input
-    if (ctx.session.purchase && ctx.session.purchase.step === 'username') {
-      console.log('Processing purchase with session data:', JSON.stringify(ctx.session.purchase, null, 2));
+    // Handle purchase username input (for both purchase and buying flows)
+    if ((ctx.session.purchase && ctx.session.purchase.step === 'username') || ctx.session.buying) {
+      const purchaseData = ctx.session.purchase || ctx.session.buying;
+      console.log('Processing purchase with session data:', JSON.stringify(purchaseData, null, 2));
       try {
-        const { type, amount, price } = ctx.session.purchase;
+        const { type, amount, price } = purchaseData;
         const username = ctx.message.text.trim();
         const userId = ctx.from.id;
         const user = ctx.from.username || 'Noma\'lum';
@@ -4728,7 +4729,12 @@ bot.on('text', async (ctx, next) => {
         }
         
         // Clear purchase session
-        delete ctx.session.purchase;
+        if (ctx.session.purchase) {
+          delete ctx.session.purchase;
+        }
+        if (ctx.session.buying) {
+          delete ctx.session.buying;
+        }
         
         // Return to main menu
         await sendMainMenu(ctx);
@@ -4738,6 +4744,9 @@ bot.on('text', async (ctx, next) => {
         await ctx.reply('Xatolik yuz berdi. Iltimos, qaytadan urinib ko\'ring.');
         if (ctx.session?.purchase) {
           delete ctx.session.purchase;
+        }
+        if (ctx.session?.buying) {
+          delete ctx.session.buying;
         }
         await sendMainMenu(ctx);
       }
