@@ -55,8 +55,8 @@ bot.use(async (ctx, next) => {
     
     // List of required channels (add your channel usernames here)
     const requiredChannels = [
-      { username: 'HOLYUCSERVIS', inviteLink: 'https://t.me/HOLYUCSERVIS' },
-      { username: 'starschatim', inviteLink: 'https://t.me/starschatim' }
+      { username: 'HOLYUCSERVIS', inviteLink: 'https://t.me/suxa_cyber' },
+      { username: 'starschatim', inviteLink: 'https://t.me/BATLEE1VS1Comunity' }
     ];
     
     // Check channel subscription
