@@ -20,6 +20,85 @@ function checkRateLimit(userId) {
   if (recentTimestamps.length >= RATE_LIMIT_MAX) {
     return false; // Rate limited
   }
+
+// --- Robux menu ---
+async function sendRobuxMenu(ctx) {
+  const caption = `☯️ARZON | ☯️GARANT | ☯️FAST\n\n` +
+    `💰ROBUX NARXLAR\n\n` +
+    `💰500 ROBUX – 81.000 UZS\n` +
+    `💰1000 ROBUX – 162.000 UZS\n` +
+    `💰2000 ROBUX – 324.000 UZS\n` +
+    `💰5250 ROBUX – 729.000 UZS\n` +
+    `💰11000 ROBUX – 1.580.000 UZS\n` +
+    `💰24000 ROBUX – 3.140.000 UZS`;
+
+  const keyboard = [];
+  for (const [amount, price] of Object.entries(ROBUX_PRICES)) {
+    keyboard.push([
+      Markup.button.callback(`${amount} Robux - ${price.toLocaleString()} so'm`, `robux:amount:${amount}`)
+    ]);
+  }
+  keyboard.push([Markup.button.callback('⬅️ Orqaga', 'back:main')]);
+
+  return sendOrUpdateMenu(ctx, caption, keyboard);
+}
+
+// Handle Robux selection
+bot.action(/robux:amount:(\d+)/, async (ctx) => {
+  const amount = ctx.match[1];
+  const price = ROBUX_PRICES[amount];
+  if (!price) return ctx.answerCbQuery('Noto\'g\'ri paket');
+  const userId = ctx.from.id;
+  const userBalance = getUserBalance(userId);
+  if (userBalance < price) {
+    const needed = price - userBalance;
+    return sendOrUpdateMenu(
+      ctx,
+      `❌ Mablag' yetarli emas!\n\n💳 Balans: ${userBalance.toLocaleString()} so'm\n💰 Kerak: ${price.toLocaleString()} so'm\n📉 Yetishmayapti: ${needed.toLocaleString()} so'm`,
+      [[Markup.button.callback('💳 Balansni to\'ldirish', 'topup:amount')],[Markup.button.callback('⬅️ Orqaga', 'back:robux')]]
+    );
+  }
+  ctx.session.robux = { step: 'user', amount, price };
+  await sendOrUpdateMenu(ctx, `Roblox username yoki User ID kiriting:\n\nMiqdor: ${amount} Robux\nNarx: ${price.toLocaleString()} so'm`, [[Markup.button.callback('⬅️ Orqaga', 'back:robux')]]);
+});
+
+// Admin confirm: Robux
+bot.action(/confirm_robux:(\w+)/, async (ctx) => {
+  if (!isAdmin(ctx)) {
+    await ctx.answerCbQuery('Ruxsat yo\'q!');
+    return;
+  }
+  const orderId = ctx.match[1];
+  const order = global.orders && global.orders[orderId];
+  if (!order || order.type !== 'robux') {
+    await ctx.answerCbQuery('Buyurtma topilmadi!');
+    return;
+  }
+  const { userId, price, amount, robloxUser } = order;
+  const userBalance = getUserBalance(userId);
+  if (userBalance < price) {
+    await ctx.reply(`❌ Foydalanuvchida yetarli mablag' yo'q. Balans: ${userBalance.toLocaleString()} so'm, kerak: ${price.toLocaleString()} so'm`);
+    return;
+  }
+  updateUserBalance(userId, -price);
+  if (global.orders[orderId]) {
+    global.orders[orderId].status = 'completed';
+    global.orders[orderId].completedAt = new Date().toISOString();
+    global.orders[orderId].completedBy = ctx.from.id;
+  }
+  await ctx.answerCbQuery('✅ Buyurtma tasdiqlandi!');
+  try {
+    await ctx.editMessageText(`${ctx.update.callback_query.message.text}\n\n✅ Tasdiqlandi`);
+  } catch {}
+  try {
+    await ctx.telegram.sendMessage(
+      userId,
+      `✅ Buyurtmangiz tasdiqlandi!\n\n💰 ${amount} Robux tez orada ${robloxUser} akkauntiga tushiriladi.`
+    );
+  } catch (e) {
+    console.error('Foydalanuvchiga xabar yuborishda xatolik:', e);
+  }
+});
   
   // Add current timestamp and update the map
   recentTimestamps.push(now);
@@ -248,6 +327,16 @@ const GST_PRICES = {
   '1000': 150000,
   '2000': 300000,
   '3000': 450000
+};
+
+// --- ROBUX narxlari ---
+const ROBUX_PRICES = {
+  '500': 81000,
+  '1000': 162000,
+  '2000': 324000,
+  '5250': 729000,
+  '11000': 1580000,
+  '24000': 3140000
 };
 
 // Session middleware barcha sozlamalar uchun
@@ -492,6 +581,61 @@ bot.on('text', async (ctx, next) => {
     await ctx.reply(`✅ Buyurtmangiz qabul qilindi!\n\n💎 Miqdor: ${amount}💎\n🎮 UID: ${uid}\n💰 Summa: ${price.toLocaleString()} so'm\n\nTez orada admin tasdiqlaydi.`);
     return;
   }
+  // Robux: collect Roblox username or user ID
+  if (ctx.session.robux && ctx.session.robux.step === 'user') {
+    const rUser = ctx.message.text.trim();
+    const { amount, price } = ctx.session.robux;
+    const userId = ctx.from.id;
+
+    if (!rUser || rUser.length < 3) {
+      await ctx.reply('❌ Iltimos, Roblox username yoki User ID kiriting.');
+      return;
+    }
+
+    const orderId = generateOrderId();
+    ctx.session.robux = undefined;
+
+    if (!global.orders) global.orders = {};
+    global.orders[orderId] = {
+      userId,
+      type: 'robux',
+      amount,
+      robloxUser: rUser,
+      price,
+      userName: ctx.from.first_name,
+      timestamp: new Date().toISOString(),
+      status: 'pending'
+    };
+
+    const adminMessage = `🧱 ROBUX buyurtma\n` +
+      `🆔 Buyurtma ID: ${orderId}\n` +
+      `💰 Miqdor: ${amount} Robux\n` +
+      `👤 Roblox: ${rUser}\n` +
+      `💵 Summa: ${price.toLocaleString()} so'm\n` +
+      `👤 TG: ${ctx.from.username || ctx.from.first_name || userId} (ID: ${userId})`;
+
+    const adminKeyboard = [
+      [
+        Markup.button.callback('✅ Tasdiqlash', `confirm_robux:${orderId}`),
+        Markup.button.callback('❌ Bekor qilish', `cancel_order:${orderId}`)
+      ]
+    ];
+
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await ctx.telegram.sendMessage(
+          adminId,
+          adminMessage,
+          { parse_mode: 'Markdown', reply_markup: { inline_keyboard: adminKeyboard } }
+        );
+      } catch (e) {
+        console.error(`Admin ${adminId} ga xabar yuborishda xatolik:`, e);
+      }
+    }
+
+    await ctx.reply(`✅ Buyurtmangiz qabul qilindi!\n\n💰 ${amount} Robux\n👤 Roblox: ${rUser}\n💵 Summa: ${price.toLocaleString()} so'm\n\nTez orada admin tasdiqlaydi.`);
+    return;
+  }
   return next();
 });
 
@@ -734,6 +878,7 @@ const MAIN_MENU = [
   'Free Fire Almaz', // Yangi qo'shildi
   'Grow a Garden',
   '🛍KURS 📉',
+  'Robux',
   'PUBG Mobile UC / PP',
   'UC Shop',
   'SOS',
@@ -860,6 +1005,11 @@ bot.action(/menu:(.+)/, async (ctx) => {
     case '🛍KURS 📉': {
       await ctx.answerCbQuery();
       await sendGstMenu(ctx);
+      break;
+    }
+    case 'Robux': {
+      await ctx.answerCbQuery();
+      await sendRobuxMenu(ctx);
       break;
     }
     case 'PUBG Mobile UC / PP': {
