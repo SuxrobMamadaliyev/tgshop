@@ -242,6 +242,14 @@ const GARDEN_SHECKLES = {
   '10': 50_000
 };
 
+// --- GSTANGOLD (KURS) Diamond paketlari ---
+const GST_PRICES = {
+  '100': 15000,
+  '1000': 150000,
+  '2000': 300000,
+  '3000': 450000
+};
+
 // Session middleware barcha sozlamalar uchun
 bot.use(session({
   defaultSession: () => ({
@@ -427,6 +435,61 @@ bot.on('text', async (ctx, next) => {
     }
 
     await ctx.reply(`✅ Buyurtmangiz qabul qilindi!\n\n📦 Nomi: ${displayName}\n🎮 O'yinchi: ${player}\n💰 Summa: ${price.toLocaleString()} so'm\n\nTez orada admin tasdiqlaydi.`);
+    return;
+  }
+  // GST: collect Free Fire UID after selecting package
+  if (ctx.session.gst && ctx.session.gst.step === 'uid') {
+    const uid = ctx.message.text.trim();
+    const { amount, price } = ctx.session.gst;
+    const userId = ctx.from.id;
+
+    if (!/^\d{5,}$/.test(uid)) {
+      await ctx.reply('❌ Iltimos, to\'g\'ri Free Fire ID raqamini kiriting!');
+      return;
+    }
+
+    const orderId = generateOrderId();
+    ctx.session.gst = undefined;
+
+    if (!global.orders) global.orders = {};
+    global.orders[orderId] = {
+      userId,
+      type: 'gst',
+      amount,
+      uid,
+      price,
+      userName: ctx.from.first_name,
+      timestamp: new Date().toISOString(),
+      status: 'pending'
+    };
+
+    const adminMessage = `🛍 KURS buyurtma\n` +
+      `🆔 Buyurtma ID: ${orderId}\n` +
+      `💎 Miqdor: ${amount}💎\n` +
+      `🎮 UID: ${uid}\n` +
+      `💰 Summa: ${price.toLocaleString()} so'm\n` +
+      `👤 Foydalanuvchi: ${ctx.from.username || ctx.from.first_name || userId} (ID: ${userId})`;
+
+    const adminKeyboard = [
+      [
+        Markup.button.callback('✅ Tasdiqlash', `confirm_gst:${orderId}`),
+        Markup.button.callback('❌ Bekor qilish', `cancel_order:${orderId}`)
+      ]
+    ];
+
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await ctx.telegram.sendMessage(
+          adminId,
+          adminMessage,
+          { parse_mode: 'Markdown', reply_markup: { inline_keyboard: adminKeyboard } }
+        );
+      } catch (e) {
+        console.error(`Admin ${adminId} ga xabar yuborishda xatolik:`, e);
+      }
+    }
+
+    await ctx.reply(`✅ Buyurtmangiz qabul qilindi!\n\n💎 Miqdor: ${amount}💎\n🎮 UID: ${uid}\n💰 Summa: ${price.toLocaleString()} so'm\n\nTez orada admin tasdiqlaydi.`);
     return;
   }
   return next();
@@ -670,6 +733,7 @@ const MAIN_MENU = [
   'TG Premium & Stars',
   'Free Fire Almaz', // Yangi qo'shildi
   'Grow a Garden',
+  '🛍KURS 📉',
   'PUBG Mobile UC / PP',
   'UC Shop',
   'SOS',
@@ -791,6 +855,11 @@ bot.action(/menu:(.+)/, async (ctx) => {
     case 'Grow a Garden': {
       await ctx.answerCbQuery();
       await sendGardenMenu(ctx);
+      break;
+    }
+    case '🛍KURS 📉': {
+      await ctx.answerCbQuery();
+      await sendGstMenu(ctx);
       break;
     }
     case 'PUBG Mobile UC / PP': {
@@ -1001,6 +1070,87 @@ async function sendUcMenu(ctx, customMessage = '') {
   
   return sendOrUpdateMenu(ctx, message, keyboard);
 }
+
+// --- GST Course menu ---
+async function sendGstMenu(ctx) {
+  const courseText =
+`🛍KURS 📉\n\n` +
+`100💎-999💎 = 15.500 soʻm 💲\n` +
+`1000💎-3000💎 = 15.000 soʻm 💲\n` +
+`9999💎-∞💎 = 14.000 so'm 💲\n\n` +
+`📦 Maxsus paketlar:\n` +
+`• 100💎 = 15.000 soʻm 💲\n` +
+`• 1000💎 = 150.000 soʻm 💲\n` +
+`• 2000💎 = 300.000 soʻm 💲\n` +
+`• 3000💎 = 450.000 soʻm 💲`;
+
+  const keyboard = [];
+  for (const [amount, price] of Object.entries(GST_PRICES)) {
+    keyboard.push([
+      Markup.button.callback(`${amount}💎 - ${price.toLocaleString()} so'm`, `gst:amount:${amount}`)
+    ]);
+  }
+  keyboard.push([Markup.button.callback('⬅️ Orqaga', 'back:main')]);
+
+  return sendOrUpdateMenu(ctx, courseText, keyboard);
+}
+
+// Handle GST package selection
+bot.action(/gst:amount:(\d+)/, async (ctx) => {
+  const amount = ctx.match[1];
+  const price = GST_PRICES[amount];
+  if (!price) return ctx.answerCbQuery('Noto\'g\'ri paket');
+  const userId = ctx.from.id;
+  const userBalance = getUserBalance(userId);
+  if (userBalance < price) {
+    const needed = price - userBalance;
+    return sendOrUpdateMenu(
+      ctx,
+      `❌ Mablag' yetarli emas!\n\n💳 Balans: ${userBalance.toLocaleString()} so'm\n💰 Kerak: ${price.toLocaleString()} so'm\n📉 Yetishmayapti: ${needed.toLocaleString()} so'm`,
+      [[Markup.button.callback('💳 Balansni to\'ldirish', 'topup:amount')],[Markup.button.callback('⬅️ Orqaga', 'back:gst')]]
+    );
+  }
+  ctx.session.gst = { step: 'uid', amount, price };
+  await sendOrUpdateMenu(ctx, `Free Fire ID raqamingizni kiriting:\n\nMiqdor: ${amount}💎\nNarx: ${price.toLocaleString()} so'm`, [[Markup.button.callback('⬅️ Orqaga', 'back:gst')]]);
+});
+
+// Admin tasdiqlash: GST
+bot.action(/confirm_gst:(\w+)/, async (ctx) => {
+  if (!isAdmin(ctx)) {
+    await ctx.answerCbQuery('Ruxsat yo\'q!');
+    return;
+  }
+  const orderId = ctx.match[1];
+  const order = global.orders && global.orders[orderId];
+  if (!order || order.type !== 'gst') {
+    await ctx.answerCbQuery('Buyurtma topilmadi!');
+    return;
+  }
+  const { userId, price, amount, uid } = order;
+  const userBalance = getUserBalance(userId);
+  if (userBalance < price) {
+    await ctx.reply(`❌ Foydalanuvchida yetarli mablag' yo'q. Balans: ${userBalance.toLocaleString()} so'm, kerak: ${price.toLocaleString()} so'm`);
+    return;
+  }
+  updateUserBalance(userId, -price);
+  if (global.orders[orderId]) {
+    global.orders[orderId].status = 'completed';
+    global.orders[orderId].completedAt = new Date().toISOString();
+    global.orders[orderId].completedBy = ctx.from.id;
+  }
+  await ctx.answerCbQuery('✅ Buyurtma tasdiqlandi!');
+  try {
+    await ctx.editMessageText(`${ctx.update.callback_query.message.text}\n\n✅ Tasdiqlandi`);
+  } catch {}
+  try {
+    await ctx.telegram.sendMessage(
+      userId,
+      `✅ Buyurtmangiz tasdiqlandi!\n\n💎 ${amount} Diamonds tez orada UID: ${uid} ga tushiriladi.`
+    );
+  } catch (e) {
+    console.error('Foydalanuvchiga xabar yuborishda xatolik:', e);
+  }
+});
 
 // --- Grow a Garden menyusi ---
 async function sendGardenMenu(ctx) {
@@ -1789,7 +1939,9 @@ bot.action(/^back:(.+)/, async (ctx) => {
       case 'garden':
         await sendGardenMenu(ctx);
         break;
-        
+      case 'gst':
+        await sendGstMenu(ctx);
+        break;
       case 'pubg':
         await sendPubgMenu(ctx);
         break;
