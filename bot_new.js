@@ -1010,11 +1010,11 @@ bot.action(/pubg:uc:(\d+):(\d+)/, async (ctx) => {
     
     await sendOrUpdateMenu(
       ctx,
-      `💎 *${amount} UC* sotib olish uchun o'yindagi foydalanuvchi nomingizni yuboring:\n\n` +
+      `💎 *${amount} UC* sotib olish uchun PUBG ID raqamingizni yuboring:\n\n` +
       `💳 To'lov miqdori: *${price.toLocaleString()} so'm*\n` +
       `💰 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n` +
       `📦 Miqdor: *${amount} UC*\n\n` +
-      `ℹ Iltimos, o'yindagi to'liq foydalanuvchi nomingizni yozing.`,
+      `ℹ Iltimos, faqat raqamlardan iborat PUBG ID (kamida 5 raqam) kiriting.`,
       [[Markup.button.callback('⬅️ Orqaga', 'pubg:buy_uc')]]
     );
   } catch (error) {
@@ -1059,11 +1059,11 @@ bot.action(/pubg:pp:(\d+):(\d+)/, async (ctx) => {
     
     await sendOrUpdateMenu(
       ctx,
-      `⭐ *${amount} PP* sotib olish uchun o'yindagi foydalanuvchi nomingizni yuboring:\n\n` +
+      `⭐ *${amount} PP* sotib olish uchun PUBG ID raqamingizni yuboring:\n\n` +
       `💳 To'lov miqdori: *${price.toLocaleString()} so'm*\n` +
       `💰 Sizning balansingiz: *${userBalance.toLocaleString()} so'm*\n` +
       `📦 Miqdor: *${amount} PP*\n\n` +
-      `ℹ Iltimos, o'yindagi to'liq foydalanuvchi nomingizni yozing.`,
+      `ℹ Iltimos, faqat raqamlardan iborat PUBG ID (kamida 5 raqam) kiriting.`,
       [[Markup.button.callback('⬅️ Orqaga', 'pubg:buy_pp')]]
     );
   } catch (error) {
@@ -3903,11 +3903,17 @@ bot.on('text', async (ctx, next) => {
   // Check if user is in the process of buying UC/PP
   if (ctx.session.buying && (ctx.session.buying.type === 'pubg_uc' || ctx.session.buying.type === 'pubg_pp')) {
     const { type, amount, price } = ctx.session.buying;
-    const username = ctx.message.text.trim();
+    const uid = ctx.message.text.trim();
     const productType = type === 'pubg_uc' ? 'UC' : 'PP';
     const orderId = generateOrderId();
     const userId = ctx.from.id;
     const userBalance = getUserBalance(userId);
+    
+    // Validate PUBG ID (numbers only, min 5 digits)
+    if (!/^\d{5,}$/.test(uid)) {
+      await ctx.reply('❌ Iltimos, faqat raqamlardan iborat PUBG ID (kamida 5 raqam) kiriting.');
+      return;
+    }
     
     // Verify user still has enough balance
     if (userBalance < price) {
@@ -3933,7 +3939,7 @@ bot.on('text', async (ctx, next) => {
       type,
       amount,
       price,
-      username,
+      uid,
       userId,
       userName: ctx.from.first_name,
       status: 'pending',
@@ -3973,7 +3979,7 @@ bot.on('text', async (ctx, next) => {
     await ctx.replyWithMarkdown(
       `✅ Sotib olish so'rovi qabul qilindi!\n\n` +
       `📦 Mahsulot: *${amount} ${productType}*\n` +
-      `👤 O'yinchi: *${username}*\n` +
+      `🎮 PUBG ID: *${uid}*\n` +
       `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
       `💰 Joriy balans: *${userBalance.toLocaleString()} so'm*\n\n` +
       `🆔 Buyurtma raqami: *${orderId}*\n` +
@@ -3986,7 +3992,7 @@ bot.on('text', async (ctx, next) => {
     const adminMessage = `🆕 *Yangi PUBG ${productType} Sotuv!*\n\n` +
       `🆔 Buyurtma: #${orderId}\n` +
       `👤 Foydalanuvchi: [${ctx.from.first_name}](tg://user?id=${ctx.from.id}) (ID: ${ctx.from.id})\n` +
-      `📱 O'yinchi: *${username}*\n` +
+      `🎮 PUBG ID: *${uid}*\n` +
       `📦 Miqdor: *${amount} ${productType}*\n` +
       `💵 Narx: *${price.toLocaleString()} so'm*\n` +
       `💰 Balans: *${userBalance.toLocaleString()} so'm*\n` +
