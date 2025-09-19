@@ -3975,18 +3975,17 @@ bot.on('text', async (ctx, next) => {
     // Clear buying state
     ctx.session.buying = null;
     
-    // Send confirmation to user
-    await ctx.replyWithMarkdown(
+    // Send confirmation to user (no Markdown to avoid underscore parsing issues)
+    const confirmText =
       `✅ Sotib olish so'rovi qabul qilindi!\n\n` +
-      `📦 Mahsulot: *${amount} ${productType}*\n` +
-      `🎮 PUBG ID: *${uid}*\n` +
-      `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
-      `💰 Joriy balans: *${userBalance.toLocaleString()} so'm*\n\n` +
-      `🆔 Buyurtma raqami: *${orderId}*\n` +
+      `📦 Mahsulot: ${amount} ${productType}\n` +
+      `🎮 PUBG ID: ${uid}\n` +
+      `💳 To'lov: ${price.toLocaleString()} so'm\n` +
+      `💰 Joriy balans: ${userBalance.toLocaleString()} so'm\n\n` +
+      `🆔 Buyurtma raqami: ${orderId}\n` +
       `📞 Aloqa: @d1yor_salee\n\n` +
-      `💡 Iltimos, to'lovni tasdiqlash uchun adminlarimiz kuting.`,
-      { parse_mode: 'Markdown' }
-    );
+      `💡 Iltimos, to'lovni tasdiqlash uchun adminlarimiz kuting.`;
+    await ctx.reply(confirmText);
     
     // Notify admin
     const adminMessage = `🆕 *Yangi PUBG ${productType} Sotuv!*\n\n` +
