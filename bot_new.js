@@ -4537,7 +4537,8 @@ bot.action(/confirm_pubg:(\w+):(\d+)/, async (ctx) => {
       return await ctx.answerCbQuery('Bu buyurtma allaqachon bajarilgan!');
     }
     
-    const { type, amount, price, username } = order;
+    const { type, amount, price } = order;
+    const playerDisplay = order.uid || order.username || 'Nomaʼlum';
     const productType = type === 'pubg_uc' ? 'UC' : 'PP';
     
     // Get current user balance
@@ -4573,7 +4574,7 @@ bot.action(/confirm_pubg:(\w+):(\d+)/, async (ctx) => {
       userId,
       `✅ Sizning #${orderId} raqamli buyurtmangiz tasdiqlandi!\n\n` +
       `📦 Mahsulot: *${amount} ${productType}*\n` +
-      `👤 O'yinchi: *${username}*\n` +
+      `🎮 PUBG ID: *${playerDisplay}*\n` +
       `💳 To'lov: *${price.toLocaleString()} so'm*\n` +
       `💰 Qolgan balans: *${(userBalance - price).toLocaleString()} so'm*\n\n` +
       `📦 Buyurtmangiz tez orada yetkazib beriladi.\n` +
