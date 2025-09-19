@@ -219,6 +219,29 @@ const PP_PRICES = {
   '100000': 235242
 };
 
+// --- Grow a Garden narxlari ---
+// "ming" -> ming so'm (x1000)
+const GARDEN_PETS = {
+  'Kitsune': 300_000,
+  'Fennec Fox': 150_000,
+  'Disco Bee': 150_000,
+  'Raccoon': 140_000,
+  'Butterfly': 100_000,
+  'Dragonfly': 50_000,
+  'Queen Bee': 25_000,
+  'Mimic Octopus': 40_000,
+  'Red Fox': 15_000,
+  'T-Rex': 40_000,
+  'Spinosaur': 60_000
+};
+
+// Sheckles paketlari (sx)
+const GARDEN_SHECKLES = {
+  '1': 10_000,
+  '5': 25_000,
+  '10': 50_000
+};
+
 // Session middleware barcha sozlamalar uchun
 bot.use(session({
   defaultSession: () => ({
@@ -346,6 +369,64 @@ bot.on('text', async (ctx, next) => {
     }
     
     await ctx.reply(`✅ Buyurtmangiz qabul qilindi!\n\n💎 Miqdor: ${amount} Almaz\n🎮 UID: ${uid}\n💰 Summa: ${price.toLocaleString()} so'm\n\nTez orada admin tasdiqlaydi.`);
+    return;
+  }
+  // Grow a Garden: collect player ID or nickname
+  if (ctx.session.garden && ctx.session.garden.step === 'player') {
+    const player = ctx.message.text.trim();
+    const { type, itemKey, displayName, price } = ctx.session.garden;
+    const userId = ctx.from.id;
+
+    if (!player || player.length < 2) {
+      await ctx.reply('❌ Iltimos, o\'yindagi ID yoki nickname kiriting.');
+      return;
+    }
+
+    const orderId = generateOrderId();
+    ctx.session.garden = undefined;
+
+    if (!global.orders) global.orders = {};
+    global.orders[orderId] = {
+      userId,
+      type: 'garden',
+      subtype: type, // 'pet' yoki 'sx'
+      item: itemKey,
+      itemName: displayName,
+      player,
+      price,
+      userName: ctx.from.first_name,
+      timestamp: new Date().toISOString(),
+      status: 'pending'
+    };
+
+    const adminMessage = `🪴 Yangi Grow a Garden buyurtma\n` +
+      `🆔 Buyurtma ID: ${orderId}\n` +
+      `📦 Turi: ${type === 'pet' ? 'Pet' : 'Sheckles'}\n` +
+      `📝 Nomi: ${displayName}\n` +
+      `🎮 O'yinchi: ${player}\n` +
+      `💰 Summa: ${price.toLocaleString()} so'm\n` +
+      `👤 Foydalanuvchi: ${ctx.from.username || ctx.from.first_name || userId} (ID: ${userId})`;
+
+    const adminKeyboard = [
+      [
+        Markup.button.callback('✅ Tasdiqlash', `confirm_garden:${orderId}`),
+        Markup.button.callback('❌ Bekor qilish', `cancel_order:${orderId}`)
+      ]
+    ];
+
+    for (const adminId of ADMIN_IDS) {
+      try {
+        await ctx.telegram.sendMessage(
+          adminId,
+          adminMessage,
+          { parse_mode: 'Markdown', reply_markup: { inline_keyboard: adminKeyboard } }
+        );
+      } catch (e) {
+        console.error(`Admin ${adminId} ga xabar yuborishda xatolik:`, e);
+      }
+    }
+
+    await ctx.reply(`✅ Buyurtmangiz qabul qilindi!\n\n📦 Nomi: ${displayName}\n🎮 O'yinchi: ${player}\n💰 Summa: ${price.toLocaleString()} so'm\n\nTez orada admin tasdiqlaydi.`);
     return;
   }
   return next();
@@ -588,6 +669,7 @@ const MAIN_MENU = [
   'Hisobim',
   'TG Premium & Stars',
   'Free Fire Almaz', // Yangi qo'shildi
+  'Grow a Garden',
   'PUBG Mobile UC / PP',
   'UC Shop',
   'SOS',
@@ -704,6 +786,11 @@ bot.action(/menu:(.+)/, async (ctx) => {
         [Markup.button.callback('⬅️ Orqaga', 'back:main')]
       ];
       await sendOrUpdateMenu(ctx, "💎 Almaz sotib olish bo'limi:", keyboard);
+      break;
+    }
+    case 'Grow a Garden': {
+      await ctx.answerCbQuery();
+      await sendGardenMenu(ctx);
       break;
     }
     case 'PUBG Mobile UC / PP': {
@@ -914,6 +1001,128 @@ async function sendUcMenu(ctx, customMessage = '') {
   
   return sendOrUpdateMenu(ctx, message, keyboard);
 }
+
+// --- Grow a Garden menyusi ---
+async function sendGardenMenu(ctx) {
+  const keyboard = [
+    [Markup.button.callback('👻👻 •Pets•', 'garden:pets')],
+    [Markup.button.callback('🪙 •Sheckles•', 'garden:sx')],
+    [Markup.button.callback('⬅️ Orqaga', 'back:main')]
+  ];
+  const caption = '🪴 GROW A GARDEN\n\n' +
+    '👻👻 •Pets• va 🪙 •Sheckles• bo\'limidan tanlang.\n\n' +
+    '🔵 ARZON 🔵 ISHONCHLI 🔵 TEZ';
+  return sendOrUpdateMenu(ctx, caption, keyboard);
+}
+
+// Show pets list
+bot.action('garden:pets', async (ctx) => {
+  await ctx.answerCbQuery();
+  const keyboard = Object.entries(GARDEN_PETS).map(([name, price]) => [
+    Markup.button.callback(`${name} - ${price.toLocaleString()} so'm`, `garden:pet:${encodeURIComponent(name)}`)
+  ]);
+  keyboard.push([Markup.button.callback('⬅️ Orqaga', 'back:garden')]);
+  const caption = '👻👻 •Pets•\n\nKeraklisini tanlang:';
+  await sendOrUpdateMenu(ctx, caption, keyboard);
+});
+
+// Show sheckles list
+bot.action('garden:sx', async (ctx) => {
+  await ctx.answerCbQuery();
+  const keyboard = Object.entries(GARDEN_SHECKLES).map(([count, price]) => [
+    Markup.button.callback(`🪙 ${count}sx - ${price.toLocaleString()} so'm`, `garden:sx:${count}`)
+  ]);
+  keyboard.push([Markup.button.callback('⬅️ Orqaga', 'back:garden')]);
+  const caption = '🪙 •Sheckles•\n\nKeraklisini tanlang:';
+  await sendOrUpdateMenu(ctx, caption, keyboard);
+});
+
+// Select a pet
+bot.action(/garden:pet:(.+)/, async (ctx) => {
+  try {
+    const itemName = decodeURIComponent(ctx.match[1]);
+    const price = GARDEN_PETS[itemName];
+    if (!price) return ctx.answerCbQuery('Noto\'g\'ri tanlov');
+    const userId = ctx.from.id;
+    const userBalance = getUserBalance(userId);
+    if (userBalance < price) {
+      const needed = price - userBalance;
+      return sendOrUpdateMenu(
+        ctx,
+        `❌ Mablag' yetarli emas!\n\n💳 Balans: ${userBalance.toLocaleString()} so'm\n💰 Kerak: ${price.toLocaleString()} so'm\n📉 Yetishmayapti: ${needed.toLocaleString()} so'm`,
+        [[Markup.button.callback('💳 Balansni to\'ldirish', 'topup:amount')],[Markup.button.callback('⬅️ Orqaga', 'back:garden')]]
+      );
+    }
+    ctx.session.garden = { step: 'player', type: 'pet', itemKey: itemName, displayName: itemName, price };
+    await sendOrUpdateMenu(ctx, `O'yindagi ID yoki nickname kiriting:\n\n📦 Tanlov: ${itemName}\n💰 Narx: ${price.toLocaleString()} so'm`, [[Markup.button.callback('⬅️ Orqaga', 'back:garden')]]);
+  } catch (e) {
+    console.error('garden:pet error', e);
+    await ctx.answerCbQuery('Xatolik yuz berdi');
+  }
+});
+
+// Select sheckles amount
+bot.action(/garden:sx:(\d+)/, async (ctx) => {
+  try {
+    const count = ctx.match[1];
+    const price = GARDEN_SHECKLES[count];
+    if (!price) return ctx.answerCbQuery('Noto\'g\'ri tanlov');
+    const userId = ctx.from.id;
+    const userBalance = getUserBalance(userId);
+    if (userBalance < price) {
+      const needed = price - userBalance;
+      return sendOrUpdateMenu(
+        ctx,
+        `❌ Mablag' yetarli emas!\n\n💳 Balans: ${userBalance.toLocaleString()} so'm\n💰 Kerak: ${price.toLocaleString()} so'm\n📉 Yetishmayapti: ${needed.toLocaleString()} so'm`,
+        [[Markup.button.callback('💳 Balansni to\'ldirish', 'topup:amount')],[Markup.button.callback('⬅️ Orqaga', 'back:garden')]]
+      );
+    }
+    const display = `${count}sx Sheckles`;
+    ctx.session.garden = { step: 'player', type: 'sx', itemKey: count, displayName: display, price };
+    await sendOrUpdateMenu(ctx, `O'yindagi ID yoki nickname kiriting:\n\n📦 Tanlov: ${display}\n💰 Narx: ${price.toLocaleString()} so'm`, [[Markup.button.callback('⬅️ Orqaga', 'back:garden')]]);
+  } catch (e) {
+    console.error('garden:sx error', e);
+    await ctx.answerCbQuery('Xatolik yuz berdi');
+  }
+});
+
+// Admin tasdiqlashi: Grow a Garden
+bot.action(/confirm_garden:(\w+)/, async (ctx) => {
+  if (!isAdmin(ctx)) {
+    await ctx.answerCbQuery('Ruxsat yo\'q!');
+    return;
+  }
+  const orderId = ctx.match[1];
+  const order = global.orders && global.orders[orderId];
+  if (!order || order.type !== 'garden') {
+    await ctx.answerCbQuery('Buyurtma topilmadi!');
+    return;
+  }
+  const { userId, price, itemName, player, subtype } = order;
+  const userBalance = getUserBalance(userId);
+  if (userBalance < price) {
+    await ctx.reply(`❌ Foydalanuvchida yetarli mablag' yo'q. Balans: ${userBalance.toLocaleString()} so'm, kerak: ${price.toLocaleString()} so'm`);
+    return;
+  }
+  updateUserBalance(userId, -price);
+  if (global.orders[orderId]) {
+    global.orders[orderId].status = 'completed';
+    global.orders[orderId].completedAt = new Date().toISOString();
+    global.orders[orderId].completedBy = ctx.from.id;
+  }
+  await ctx.answerCbQuery('✅ Buyurtma tasdiqlandi!');
+  try {
+    await ctx.editMessageText(`${ctx.update.callback_query.message.text}\n\n✅ Tasdiqlandi`);
+  } catch {}
+  try {
+    await ctx.telegram.sendMessage(
+      userId,
+      `✅ Buyurtmangiz tasdiqlandi!\n\n🪴 ${subtype === 'pet' ? 'Pet' : 'Sheckles'}: ${itemName}\n🎮 O'yinchi: ${player}`
+    );
+  } catch (e) {
+    console.error('Foydalanuvchiga xabar yuborishda xatolik:', e);
+  }
+});
 
 // PP sotib olish menyusi
 async function sendPpMenu(ctx, customMessage = '') {
@@ -1576,6 +1785,9 @@ bot.action(/^back:(.+)/, async (ctx) => {
           ctx.session = {};
         }
         await sendMainMenu(ctx);
+        break;
+      case 'garden':
+        await sendGardenMenu(ctx);
         break;
         
       case 'pubg':
