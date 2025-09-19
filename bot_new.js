@@ -1165,6 +1165,85 @@ async function sendGstMenu(ctx) {
   return sendOrUpdateMenu(ctx, courseText, keyboard);
 }
 
+// --- Robux menu ---
+async function sendRobuxMenu(ctx) {
+  const caption = `☯️ARZON | ☯️GARANT | ☯️FAST\n\n` +
+    `💰ROBUX NARXLAR\n\n` +
+    `💰500 ROBUX – 81.000 UZS\n` +
+    `💰1000 ROBUX – 162.000 UZS\n` +
+    `💰2000 ROBUX – 324.000 UZS\n` +
+    `💰5250 ROBUX – 729.000 UZS\n` +
+    `💰11000 ROBUX – 1.580.000 UZS\n` +
+    `💰24000 ROBUX – 3.140.000 UZS`;
+
+  const keyboard = [];
+  for (const [amount, price] of Object.entries(ROBUX_PRICES)) {
+    keyboard.push([
+      Markup.button.callback(`${amount} Robux - ${price.toLocaleString()} so'm`, `robux:amount:${amount}`)
+    ]);
+  }
+  keyboard.push([Markup.button.callback('⬅️ Orqaga', 'back:main')]);
+
+  return sendOrUpdateMenu(ctx, caption, keyboard);
+}
+
+// Handle Robux selection
+bot.action(/robux:amount:(\d+)/, async (ctx) => {
+  const amount = ctx.match[1];
+  const price = ROBUX_PRICES[amount];
+  if (!price) return ctx.answerCbQuery('Noto\'g\'ri paket');
+  const userId = ctx.from.id;
+  const userBalance = getUserBalance(userId);
+  if (userBalance < price) {
+    const needed = price - userBalance;
+    return sendOrUpdateMenu(
+      ctx,
+      `❌ Mablag' yetarli emas!\n\n💳 Balans: ${userBalance.toLocaleString()} so'm\n💰 Kerak: ${price.toLocaleString()} so'm\n📉 Yetishmayapti: ${needed.toLocaleString()} so'm`,
+      [[Markup.button.callback('💳 Balansni to\'ldirish', 'topup:amount')],[Markup.button.callback('⬅️ Orqaga', 'back:robux')]]
+    );
+  }
+  ctx.session.robux = { step: 'user', amount, price };
+  await sendOrUpdateMenu(ctx, `Roblox username yoki User ID kiriting:\n\nMiqdor: ${amount} Robux\nNarx: ${price.toLocaleString()} so'm`, [[Markup.button.callback('⬅️ Orqaga', 'back:robux')]]);
+});
+
+// Admin confirm: Robux
+bot.action(/confirm_robux:(\w+)/, async (ctx) => {
+  if (!isAdmin(ctx)) {
+    await ctx.answerCbQuery('Ruxsat yo\'q!');
+    return;
+  }
+  const orderId = ctx.match[1];
+  const order = global.orders && global.orders[orderId];
+  if (!order || order.type !== 'robux') {
+    await ctx.answerCbQuery('Buyurtma topilmadi!');
+    return;
+  }
+  const { userId, price, amount, robloxUser } = order;
+  const userBalance = getUserBalance(userId);
+  if (userBalance < price) {
+    await ctx.reply(`❌ Foydalanuvchida yetarli mablag' yo'q. Balans: ${userBalance.toLocaleString()} so'm, kerak: ${price.toLocaleString()} so'm`);
+    return;
+  }
+  updateUserBalance(userId, -price);
+  if (global.orders[orderId]) {
+    global.orders[orderId].status = 'completed';
+    global.orders[orderId].completedAt = new Date().toISOString();
+    global.orders[orderId].completedBy = ctx.from.id;
+  }
+  await ctx.answerCbQuery('✅ Buyurtma tasdiqlandi!');
+  try {
+    await ctx.editMessageText(`${ctx.update.callback_query.message.text}\n\n✅ Tasdiqlandi`);
+  } catch {}
+  try {
+    await ctx.telegram.sendMessage(
+      userId,
+      `✅ Buyurtmangiz tasdiqlandi!\n\n💰 ${amount} Robux tez orada ${robloxUser} akkauntiga tushiriladi.`
+    );
+  } catch (e) {
+    console.error('Foydalanuvchiga xabar yuborishda xatolik:', e);
+  }
+});
+
 // Handle GST package selection
 bot.action(/gst:amount:(\d+)/, async (ctx) => {
   const amount = ctx.match[1];
